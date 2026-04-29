@@ -40,4 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DYNAMIC_KEYMAP_LAYER_COUNT 6
 
+#define AUTO_MOUSE_DEFAULT_LAYER 6  // AMLはレイヤー6にする
+
 #define AUTO_MOUSE_LAYER_KEEP_TIME 30000  // AML保持時間
