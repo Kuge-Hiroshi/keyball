@@ -98,9 +98,15 @@ enum combo_events {
   PARENTHESES,
   SQUARE_BRACKETS,
   CURLY_BRACKETS,
-  PASTE_VALUE,
+  HASH_TAG,
+  AT_MARK,
+  DELETE_KEY,
+  SEMICOLON,
+  COLON,
+  SINGLE_QUOTE,
+  DOUBLE_QUOTE,
   CMB_ALTTAB,
-  COMBO_COUNT  // Comboの数を自動計算
+  COMBO_COUNT
 };
 
 const uint16_t PROGMEM paren_combo[] = {KC_K, KC_L, COMBO_END};
@@ -125,8 +131,8 @@ combo_t key_combos[COMBO_COUNT] = {
   [CMB_ALTTAB] = COMBO(combo_alttab, KC_NO), // KC_NO to leave processing for process_combo_event
   [HASH_TAG] = COMBO_ACTION(hash_combo),
   [AT_MARK] = COMBO_ACTION(at_combo),
-  [DELTE] = COMBO_ACTION(del_combo),
-  [SEMICLON] = COMBO_ACTION(semicolon_combo),
+  [DELETE_KEY] = COMBO_ACTION(del_combo),
+  [SEMICOLON] = COMBO_ACTION(semicolon_combo),
   [COLON] = COMBO_ACTION(colon_combo),
   [SINGLE_QUOTE] = COMBO_ACTION(singleq_combo),
   [DOUBLE_QUOTE] = COMBO_ACTION(doubleq_combo),
@@ -183,12 +189,12 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
         tap_code16(KC_AT);
       }
       break;
-    case DELTE:
+    case DELETE_KEY:
       if (pressed) {
         tap_code16(KC_DEL);
       }
       break;
-    case SEMICLON:
+    case SEMICOLON:
       if (pressed) {
         tap_code16(KC_SCLN);
       }
