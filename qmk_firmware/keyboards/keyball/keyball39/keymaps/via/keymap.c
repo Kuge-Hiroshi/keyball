@@ -116,7 +116,7 @@ const uint16_t PROGMEM cubra_combo[] = {KC_COMM, KC_DOT, COMBO_END};
 const uint16_t PROGMEM combo_alttab[] = {KC_D, KC_F, COMBO_END};
 const uint16_t PROGMEM hash_combo[] = {KC_I, KC_U, COMBO_END};
 const uint16_t PROGMEM at_combo[] = {KC_J, KC_K, COMBO_END};
-const uint16_t PROGMEM del_combo[] = {KC_M, KC_COMM, COMBO_END};
+const uint16_t PROGMEM exclamation_combo[] = {KC_M, KC_COMM, COMBO_END};
 const uint16_t PROGMEM semicolon_combo[] = {KC_E, KC_R, COMBO_END};
 const uint16_t PROGMEM colon_combo[] = {KC_E, KC_W, COMBO_END};
 const uint16_t PROGMEM singleq_combo[] = {KC_C, KC_V, COMBO_END};
@@ -131,7 +131,7 @@ combo_t key_combos[COMBO_COUNT] = {
   [CMB_ALTTAB] = COMBO(combo_alttab, KC_NO), // KC_NO to leave processing for process_combo_event
   [HASH_TAG] = COMBO_ACTION(hash_combo),
   [AT_MARK] = COMBO_ACTION(at_combo),
-  [DELETE_KEY] = COMBO_ACTION(del_combo),
+  [EXCLAMATION] = COMBO_ACTION(exclamation_combo),
   [SEMICOLON] = COMBO_ACTION(semicolon_combo),
   [COLON] = COMBO_ACTION(colon_combo),
   [SINGLE_QUOTE] = COMBO_ACTION(singleq_combo),
@@ -178,7 +178,6 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
         unregister_mods(MOD_LALT);
       }
       break;    
-
     case HASH_TAG:
       if (pressed) {
         tap_code16(KC_HASH);
@@ -189,9 +188,9 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
         tap_code16(KC_AT);
       }
       break;
-    case DELETE_KEY:
+    case EXCLAMATION:
       if (pressed) {
-        tap_code16(KC_DEL);
+        tap_code16(S(KC_1));
       }
       break;
     case SEMICOLON:
