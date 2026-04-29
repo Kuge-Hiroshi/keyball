@@ -71,6 +71,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 layer_state_t layer_state_set_user(layer_state_t state) {
     // Auto enable scroll mode when the highest layer is 3
     keyball_set_scroll_mode(get_highest_layer(state) == 3);
+
+    // AML保持用
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    keyball_handle_auto_mouse_layer_change(state);
+#endif
     return state;
 }
 
@@ -85,7 +90,3 @@ void oledkit_render_info_user(void) {
 }
 #endif
 
-// AML保持用
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    keyball_handle_auto_mouse_layer_change(state);
-#endif
