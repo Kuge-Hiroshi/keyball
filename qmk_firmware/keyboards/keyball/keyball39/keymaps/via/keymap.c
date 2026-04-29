@@ -108,6 +108,13 @@ const uint16_t PROGMEM sqbra_combo[] = {KC_I, KC_O, COMBO_END};
 const uint16_t PROGMEM cubra_combo[] = {KC_COMM, KC_DOT, COMBO_END};
 // const uint16_t PROGMEM paste_combo[] = {KC_C, KC_V, COMBO_END};
 const uint16_t PROGMEM combo_alttab[] = {KC_D, KC_F, COMBO_END};
+const uint16_t PROGMEM hash_combo[] = {KC_I, KC_U, COMBO_END};
+const uint16_t PROGMEM at_combo[] = {KC_J, KC_K, COMBO_END};
+const uint16_t PROGMEM del_combo[] = {KC_M, KC_COMM, COMBO_END};
+const uint16_t PROGMEM semicolon_combo[] = {KC_E, KC_R, COMBO_END};
+const uint16_t PROGMEM colon_combo[] = {KC_E, KC_W, COMBO_END};
+const uint16_t PROGMEM singleq_combo[] = {KC_C, KC_V, COMBO_END};
+const uint16_t PROGMEM doubleq_combo[] = {KC_C, KC_X, COMBO_END};
 
 
 combo_t key_combos[COMBO_COUNT] = {
@@ -116,6 +123,14 @@ combo_t key_combos[COMBO_COUNT] = {
   [CURLY_BRACKETS] = COMBO_ACTION(cubra_combo),
   // [PASTE_VALUE] = COMBO_ACTION(paste_combo),
   [CMB_ALTTAB] = COMBO(combo_alttab, KC_NO), // KC_NO to leave processing for process_combo_event
+  [HASH_TAG] = COMBO_ACTION(hash_combo),
+  [AT_MARK] = COMBO_ACTION(at_combo),
+  [DELTE] = COMBO_ACTION(del_combo),
+  [SEMICLON] = COMBO_ACTION(semicolon_combo),
+  [COLON] = COMBO_ACTION(colon_combo),
+  [SINGLE_QUOTE] = COMBO_ACTION(singleq_combo),
+  [DOUBLE_QUOTE] = COMBO_ACTION(doubleq_combo),
+
 };
 // COMBO_ACTION(x) is same as COMBO(x, KC_NO)
 
@@ -128,20 +143,20 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
   switch(combo_index) {
     case PARENTHESES:
       if (pressed) {
-        tap_code16(S(KC_8));
         tap_code16(S(KC_9));
+        tap_code16(S(KC_0));
       }
       break;
     case SQUARE_BRACKETS:
       if (pressed) {
+        tap_code(KC_LBRC);
         tap_code(KC_RBRC);
-        tap_code(KC_BSLS);
       }
       break;
     case CURLY_BRACKETS:
       if (pressed) {
+        tap_code16(S(KC_LBRC));
         tap_code16(S(KC_RBRC));
-        tap_code16(S(KC_BSLS));
       }
       break;
     // case PASTE_VALUE:
@@ -157,6 +172,43 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
         unregister_mods(MOD_LALT);
       }
       break;    
+
+    case HASH_TAG:
+      if (pressed) {
+        tap_code16(KC_HASH);
+      }
+      break;
+    case AT_MARK:
+      if (pressed) {
+        tap_code16(KC_AT);
+      }
+      break;
+    case DELTE:
+      if (pressed) {
+        tap_code16(KC_DEL);
+      }
+      break;
+    case SEMICLON:
+      if (pressed) {
+        tap_code16(KC_SCLN);
+      }
+      break;    
+      case COLON:
+      if (pressed) {
+        tap_code16(S(KC_SCLN));
+      }
+      break;
+    case SINGLE_QUOTE:
+      if (pressed) {
+        tap_code16(KC_QUOT);
+      }
+      break;
+    case DOUBLE_QUOTE:
+      if (pressed) {
+        tap_code16(S(KC_QUOT));
+      }
+      break;
+      
   }
 }
 
