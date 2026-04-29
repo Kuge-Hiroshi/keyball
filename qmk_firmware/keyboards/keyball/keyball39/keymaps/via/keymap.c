@@ -84,3 +84,8 @@ void oledkit_render_info_user(void) {
     keyball_oled_render_layerinfo();
 }
 #endif
+
+// AML保持用
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    keyball_handle_auto_mouse_layer_change(state);
+#endif
