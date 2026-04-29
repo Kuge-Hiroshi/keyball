@@ -33,11 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#    define RGBLIGHT_EFFECT_TWINKLE
 //#endif
 
-#define TAP_CODE_DELAY 4
+#define TAP_CODE_DELAY 5
 
 #define POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #define AUTO_MOUSE_DEFAULT_LAYER 2
 
 #define DYNAMIC_KEYMAP_LAYER_COUNT 6
 
+// #define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
+// #define TAPPING_TERM 250
+// #define QUICK_TAP_TERM 120 
 #define AUTO_MOUSE_LAYER_KEEP_TIME 30000  // AML保持時間
+
+#ifdef COMBO_ENABLE
+#    define COMBO_TERM 80
+#endif
