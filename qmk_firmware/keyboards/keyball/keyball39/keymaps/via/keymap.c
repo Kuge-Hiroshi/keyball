@@ -156,18 +156,21 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
       if (pressed) {
         tap_code16(S(KC_9));
         tap_code16(S(KC_0));
+        tap_code(KC_LEFT);
       }
       break;
     case SQUARE_BRACKETS:
       if (pressed) {
         tap_code(KC_LBRC);
         tap_code(KC_RBRC);
+        tap_code(KC_LEFT);
       }
       break;
     case CURLY_BRACKETS:
       if (pressed) {
         tap_code16(S(KC_LBRC));
         tap_code16(S(KC_RBRC));
+        tap_code(KC_LEFT);
       }
       break;
     // case PASTE_VALUE:
@@ -211,11 +214,15 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
     case SINGLE_QUOTE:
       if (pressed) {
         tap_code16(KC_QUOT);
+        tap_code16(KC_QUOT);
+        tap_code(KC_LEFT);
       }
       break;
     case DOUBLE_QUOTE:
       if (pressed) {
         tap_code16(S(KC_QUOT));
+        tap_code16(S(KC_QUOT));
+        tap_code(KC_LEFT);
       }
       break;
       
