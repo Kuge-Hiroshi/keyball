@@ -219,18 +219,16 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
     case SINGLE_QUOTE:
       if (pressed) {
         tap_code16(KC_QUOT);
-        tap_code16(KC_QUOT);
       }
       break;
     case DOUBLE_QUOTE:
       if (pressed) {
         tap_code16(S(KC_QUOT));
-        tap_code16(S(KC_QUOT));
       }
       break;
     case YEN_MARK:
       if (pressed) {
-        tap_code16(KC_INT3);
+        tap_code16(KC_BSLS);
       }
       break;
   }
