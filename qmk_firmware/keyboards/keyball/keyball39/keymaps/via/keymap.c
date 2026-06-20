@@ -86,6 +86,24 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     return state;
 }
 
+void keyboard_post_init_user(void) {
+    // 縦スクロール固定
+    keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
+
+    // CPI = 500
+    keyball_set_cpi(5);
+
+    // スクロール速度 = 7
+    keyball_set_scroll_div(7);
+
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    set_auto_mouse_enable(true);
+#endif
+}
+
+
+
+
 #ifdef OLED_ENABLE
 
 #    include "lib/oledkit/oledkit.h"
