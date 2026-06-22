@@ -237,6 +237,24 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 #endif  // COMBO_ENABLE
 
+/ ==============================
+// Kb21 + トラックボールで Alt+Tab 操作
+// ==============================
+// Remap の Kb 21 を押している間だけ、ボール移動をアプリ切り替え操作に変換します。
+//   Kb21 + 上    : Alt+Tab 画面を開く
+//   Kb21 + 右    : 次のアプリへ移動
+//   Kb21 + 左    : 前のアプリへ移動
+//   Kb21 を離す  : Alt を離して選択を確定
+//
+// 感度を変えたい場合はこの数値を調整してください。
+// 小さいほど少しのボール移動で反応します。
+#define APP_SWITCH_GESTURE_THRESHOLD 30
+
+static bool app_switch_mode   = false;
+static bool alt_tab_active    = false;
+static int16_t app_switch_x   = 0;
+static int16_t app_switch_y   = 0;
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
 
@@ -252,10 +270,57 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 return false;
             }
             return true;
+
+        // Remap の Kb 21
+        // 押している間だけ、トラックボール操作を Alt+Tab 操作に変換する
+        case QK_KB_21:
+            app_switch_mode = record->event.pressed;
+
+            // Kb21 を離したら Alt を離して、選択中のアプリに確定する
+            if (!app_switch_mode && alt_tab_active) {
+                unregister_code(KC_LALT);
+                alt_tab_active = false;
+            }
+
+            app_switch_x = 0;
+            app_switch_y = 0;
+            return false;
     }
 
     return true;
 }
-//////////////////////////////
-/// カスタムキーコード。ここまで ///
-//////////////////////////////
+
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    if (app_switch_mode) {
+        app_switch_x += mouse_report.x;
+        app_switch_y += mouse_report.y;
+
+        // Kb21 押下中はカーソルを動かさない
+        mouse_report.x = 0;
+        mouse_report.y = 0;
+
+        // 上方向: Alt+Tab 画面を開く
+        // 環境によって上下が逆に感じる場合は、"<" を ">" に変更してください。
+        if (app_switch_y < -APP_SWITCH_GESTURE_THRESHOLD && !alt_tab_active) {
+            register_code(KC_LALT);
+            tap_code(KC_TAB);
+            alt_tab_active = true;
+            app_switch_x = 0;
+            app_switch_y = 0;
+        }
+
+        // 右方向: 次のアプリへ
+        if (app_switch_x > APP_SWITCH_GESTURE_THRESHOLD && alt_tab_active) {
+            tap_code(KC_TAB);
+            app_switch_x = 0;
+        }
+
+        // 左方向: 前のアプリへ
+        if (app_switch_x < -APP_SWITCH_GESTURE_THRESHOLD && alt_tab_active) {
+            tap_code16(S(KC_TAB));
+            app_switch_x = 0;
+        }
+    }
+
+    return mouse_report;
+}
