@@ -333,10 +333,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23) {
+        // 通常レイヤーでは x/y、スクロールレイヤーでは h/v に変換されるため、両方をジェスチャー量に加算する
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
 
-        // Kb21/Kb22 押下中はカーソル移動やスクロールを発生させない
+        // スクロールレイヤー用: h/v は値が小さいため倍率を掛ける
+        gesture_x += mouse_report.h * 16;
+        gesture_y += mouse_report.v * 16;
+
+        // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
         mouse_report.y = 0;
         mouse_report.h = 0;
