@@ -237,7 +237,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 #endif  // COMBO_ENABLE
 
-/ ==============================
+// ==============================
 // Kb21 + トラックボールで Alt+Tab 操作
 // ==============================
 // Remap の Kb 21 を押している間だけ、ボール移動をアプリ切り替え操作に変換します。
@@ -323,4 +323,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     }
 
     return mouse_report;
+}
+
+bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
+    switch (keycode) {
+        case LSFT_T(KC_LNG2):  // tap: Lang2 / hold: Shift
+        case LCTL_T(KC_LNG1):  // tap: Lang1 / hold: Ctrl
+            return true;
+        default:
+            return false;
+    }
 }
