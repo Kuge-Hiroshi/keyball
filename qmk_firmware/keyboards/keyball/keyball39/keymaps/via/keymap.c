@@ -236,24 +236,41 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 
 #endif  // COMBO_ENABLE
-
 // ==============================
-// Kb21 + トラックボールで Alt+Tab 操作
+// Kb21 / Kb22 + トラックボール ジェスチャー
 // ==============================
-// Remap の Kb 21 を押している間だけ、ボール移動をアプリ切り替え操作に変換します。
-//   Kb21 + 上    : Alt+Tab 画面を開く
-//   Kb21 + 右    : 次のアプリへ移動
-//   Kb21 + 左    : 前のアプリへ移動
-//   Kb21 を離す  : Alt を離して選択を確定
+// Kb20:
+//   既存機能のまま
+//   レイヤー3中だけ、押している間は横スクロールにする
+//
+// Kb21:
+//   Kb21 + 上    : Win+Tab
+//   Kb21 + 左    : 仮想デスクトップ左へ移動
+//   Kb21 + 右    : 仮想デスクトップ右へ移動
+//   Kb21 + 下    : デスクトップ表示
+//
+// Kb22:
+//   Kb22 + 上    : Alt+Tab 画面を開く
+//   Kb22 + 右    : 次のアプリへ移動
+//   Kb22 + 左    : 前のアプリへ移動
+//   Kb22 + 下    : Alt+F4
+//   Kb22 を離す  : Alt を離して選択を確定
 //
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
-#define APP_SWITCH_GESTURE_THRESHOLD 300
+// 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
+#define GESTURE_THRESHOLD 500
 
-static bool app_switch_mode   = false;
-static bool alt_tab_active    = false;
-static int16_t app_switch_x   = 0;
-static int16_t app_switch_y   = 0;
+static bool gesture_mode_21 = false;
+static bool gesture_mode_22 = false;
+static bool alt_tab_active  = false;
+static int16_t gesture_x    = 0;
+static int16_t gesture_y    = 0;
+
+static void reset_gesture_amount(void) {
+    gesture_x = 0;
+    gesture_y = 0;
+}
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
@@ -272,18 +289,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return true;
 
         // Remap の Kb 21
-        // 押している間だけ、トラックボール操作を Alt+Tab 操作に変換する
+        // トラックボール操作を Win 系ショートカットに変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_21:
-            app_switch_mode = record->event.pressed;
+            gesture_mode_21 = record->event.pressed;
+            reset_gesture_amount();
+            return false;
 
-            // Kb21 を離したら Alt を離して、選択中のアプリに確定する
-            if (!app_switch_mode && alt_tab_active) {
+        // Remap の Kb 22
+        // トラックボール操作を Alt+Tab 系ショートカットに変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
+        case QK_KB_22:
+            gesture_mode_22 = record->event.pressed;
+
+            // Kb22 を離したら Alt を離して、選択中のアプリに確定する
+            if (!gesture_mode_22 && alt_tab_active) {
                 unregister_code(KC_LALT);
                 alt_tab_active = false;
             }
 
-            app_switch_x = 0;
-            app_switch_y = 0;
+            reset_gesture_amount();
             return false;
     }
 
@@ -291,34 +316,73 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    if (app_switch_mode) {
-        app_switch_x += mouse_report.x;
-        app_switch_y += mouse_report.y;
+    if (gesture_mode_21 || gesture_mode_22) {
+        gesture_x += mouse_report.x;
+        gesture_y += mouse_report.y;
 
-        // Kb21 押下中はカーソルを動かさない
+        // Kb21/Kb22 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
         mouse_report.y = 0;
+        mouse_report.h = 0;
+        mouse_report.v = 0;
 
-        // 上方向: Alt+Tab 画面を開く
-        // 環境によって上下が逆に感じる場合は、"<" を ">" に変更してください。
-        if (app_switch_y < -APP_SWITCH_GESTURE_THRESHOLD && !alt_tab_active) {
-            register_code(KC_LALT);
-            tap_code(KC_TAB);
-            alt_tab_active = true;
-            app_switch_x = 0;
-            app_switch_y = 0;
+        if (gesture_mode_21) {
+            // 上: Win+Tab
+            // 環境によって上下が逆に感じる場合は、"<" と ">" を入れ替えてください。
+            if (gesture_y < -GESTURE_THRESHOLD) {
+                tap_code16(G(KC_TAB));
+                reset_gesture_amount();
+            }
+
+            // 下: デスクトップ表示
+            if (gesture_y > GESTURE_THRESHOLD) {
+                tap_code16(G(KC_D));
+                reset_gesture_amount();
+            }
+
+            // 右: 仮想デスクトップ右
+            if (gesture_x > GESTURE_THRESHOLD) {
+                tap_code16(C(G(KC_RGHT)));
+                reset_gesture_amount();
+            }
+
+            // 左: 仮想デスクトップ左
+            if (gesture_x < -GESTURE_THRESHOLD) {
+                tap_code16(C(G(KC_LEFT)));
+                reset_gesture_amount();
+            }
         }
 
-        // 右方向: 次のアプリへ
-        if (app_switch_x > APP_SWITCH_GESTURE_THRESHOLD && alt_tab_active) {
-            tap_code(KC_TAB);
-            app_switch_x = 0;
-        }
+        if (gesture_mode_22) {
+            // 上: Alt+Tab 画面を開く
+            if (gesture_y < -GESTURE_THRESHOLD && !alt_tab_active) {
+                register_code(KC_LALT);
+                tap_code(KC_TAB);
+                alt_tab_active = true;
+                reset_gesture_amount();
+            }
 
-        // 左方向: 前のアプリへ
-        if (app_switch_x < -APP_SWITCH_GESTURE_THRESHOLD && alt_tab_active) {
-            tap_code16(S(KC_TAB));
-            app_switch_x = 0;
+            // 下: Alt+F4
+            if (gesture_y > GESTURE_THRESHOLD) {
+                if (alt_tab_active) {
+                    unregister_code(KC_LALT);
+                    alt_tab_active = false;
+                }
+                tap_code16(A(KC_F4));
+                reset_gesture_amount();
+            }
+
+            // 右: 次のアプリへ
+            if (gesture_x > GESTURE_THRESHOLD && alt_tab_active) {
+                tap_code(KC_TAB);
+                reset_gesture_amount();
+            }
+
+            // 左: 前のアプリへ
+            if (gesture_x < -GESTURE_THRESHOLD && alt_tab_active) {
+                tap_code16(S(KC_TAB));
+                reset_gesture_amount();
+            }
         }
     }
 
@@ -334,3 +398,4 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 }
+
