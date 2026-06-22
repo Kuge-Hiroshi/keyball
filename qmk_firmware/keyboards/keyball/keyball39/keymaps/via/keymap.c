@@ -256,6 +256,13 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb22 + 下    : Alt+F4
 //   Kb22 を離す  : Alt を離して選択を確定
 //
+// Kb23:
+//   Kb23 + 上    : アクティブウィンドウを最大化 Win+Up
+//   Kb23 + 左    : アクティブウィンドウを左にスナップ Win+Left
+//   Kb23 + 右    : アクティブウィンドウを右にスナップ Win+Right
+//   Kb23 + 下    : アクティブウィンドウを最小化/復元 Win+Down
+//
+
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
@@ -263,6 +270,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
+static bool gesture_mode_23 = false;
 static bool alt_tab_active  = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
@@ -310,13 +318,21 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
             reset_gesture_amount();
             return false;
+
+        // Remap の Kb 23
+        // トラックボール操作をアクティブウィンドウ操作 Win+矢印 に変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
+        case QK_KB_23:
+            gesture_mode_23 = record->event.pressed;
+            reset_gesture_amount();
+            return false;
     }
 
     return true;
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    if (gesture_mode_21 || gesture_mode_22) {
+    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23) {
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
 
@@ -383,6 +399,32 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 左: 前のアプリへ
             if (gesture_x < -GESTURE_THRESHOLD && alt_tab_active) {
                 tap_code16(S(KC_TAB));
+                reset_gesture_amount();
+            }
+        }
+
+        if (gesture_mode_23) {
+            // 上: アクティブウィンドウを最大化
+            if (gesture_y < -GESTURE_THRESHOLD) {
+                tap_code16(G(KC_UP));
+                reset_gesture_amount();
+            }
+
+            // 下: アクティブウィンドウを最小化/復元
+            if (gesture_y > GESTURE_THRESHOLD) {
+                tap_code16(G(KC_DOWN));
+                reset_gesture_amount();
+            }
+
+            // 右: アクティブウィンドウを右にスナップ
+            if (gesture_x > GESTURE_THRESHOLD) {
+                tap_code16(G(KC_RGHT));
+                reset_gesture_amount();
+            }
+
+            // 左: アクティブウィンドウを左にスナップ
+            if (gesture_x < -GESTURE_THRESHOLD) {
+                tap_code16(G(KC_LEFT));
                 reset_gesture_amount();
             }
         }
