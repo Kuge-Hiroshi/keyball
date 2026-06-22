@@ -259,7 +259,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 500
+#define GESTURE_THRESHOLD 300
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
