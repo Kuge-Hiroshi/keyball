@@ -338,8 +338,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         gesture_y += mouse_report.y;
 
         // スクロールレイヤー用: h/v は値が小さいため倍率を掛ける
+        // 通常のスクロールレイヤーは縦固定のままにするが、
+        // Kb21/Kb22/Kb23 押下中だけは横方向 h もジェスチャー判定に使う。
+        // v は通常の y と上下が逆になるため、符号を反転する。
         gesture_x += mouse_report.h * 16;
-        gesture_y += mouse_report.v * 16;
+        gesture_y -= mouse_report.v * 16;
+
+        // 縦固定スクロール中でも、ジェスチャー中は物理ボールの横移動を拾えるように x も見る
+        gesture_x += mouse_report.x;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
@@ -386,11 +392,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 下: Alt+Tab中の選択アプリを閉じる
             if (gesture_y > GESTURE_THRESHOLD) {
                 if (alt_tab_active) {
+                    register_code(KC_LALT);   // 念のためAltを保持し直す
                     tap_code(KC_F4);          // Altを押したままF4
                     unregister_code(KC_LALT);
                     alt_tab_active = false;
                 } else {
-                    tap_code16(A(KC_F4));     // 通常時はAlt+F4
+                    register_code(KC_LALT);   // 通常時も確実にAlt+F4を送る
+                    tap_code(KC_F4);
+                    unregister_code(KC_LALT);
                 }
                 reset_gesture_amount();
             }
