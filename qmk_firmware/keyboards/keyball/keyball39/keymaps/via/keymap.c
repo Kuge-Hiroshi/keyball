@@ -236,7 +236,6 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 
 #endif  // COMBO_ENABLE
-// COMBO_ENABLE
 // ==============================
 // Kb21 / Kb22 + トラックボール ジェスチャー
 // ==============================
@@ -267,7 +266,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 200
+#define GESTURE_THRESHOLD 150
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
@@ -415,10 +414,15 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 下: Alt+Tab中の選択アプリを閉じる
             if (gesture_y > GESTURE_THRESHOLD) {
                 if (alt_tab_active) {
-                    register_code(KC_LALT);   // 念のためAltを保持し直す
-                    tap_code(KC_F4);          // Altを押したままF4
+                    // Alt+Tab画面上ではAlt+F4が効かず選択だけになることがあるため、
+                    // いったんAltを離して選択中ウィンドウをアクティブ化し、
+                    // 少し待ってからAlt+F4を送る。
                     unregister_code(KC_LALT);
                     alt_tab_active = false;
+                    wait_ms(120);
+                    register_code(KC_LALT);
+                    tap_code(KC_F4);
+                    unregister_code(KC_LALT);
                 } else {
                     register_code(KC_LALT);   // 通常時も確実にAlt+F4を送る
                     tap_code(KC_F4);
@@ -479,3 +483,4 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 }
+
