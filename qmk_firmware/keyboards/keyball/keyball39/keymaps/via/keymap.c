@@ -283,6 +283,8 @@ static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
 static bool kb24_scroll_div_active = false;
 static bool kb25_cpi_active = false;
+static bool kb24_seen_layer3 = false;
+static bool kb25_seen_layer6 = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
 
@@ -403,6 +405,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 keyball_set_scroll_div(KB24_SCROLL_DIV);
                 kb24_scroll_div_active = true;
+                kb24_seen_layer3 = layer_state_is(3);
             }
             return false;
 
@@ -412,6 +415,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 keyball_set_cpi(KB25_CPI);
                 kb25_cpi_active = true;
+                kb25_seen_layer6 = layer_state_is(6);
             }
             return false;
     }
@@ -420,16 +424,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    // Kb24/Kb25 の一時変更は、対象レイヤーを離れたらここで確実に元へ戻す
-    // layer_state_set_user() ではなく毎回監視するため、戻し忘れを防ぎやすい
-    if (kb24_scroll_div_active && !layer_state_is(3)) {
-        keyball_set_scroll_div(DEFAULT_SCROLL_DIV);
-        kb24_scroll_div_active = false;
+    // Kb24/Kb25 の一時変更は、対象レイヤーに一度入ったあと、
+    // その対象レイヤーを離れた時だけ元に戻す。
+    // これにより、Kb24だけ先に押してからレイヤー3へ入る使い方でも即解除されない。
+    if (kb24_scroll_div_active) {
+        if (layer_state_is(3)) {
+            kb24_seen_layer3 = true;
+        } else if (kb24_seen_layer3) {
+            keyball_set_scroll_div(DEFAULT_SCROLL_DIV);
+            kb24_scroll_div_active = false;
+            kb24_seen_layer3 = false;
+        }
     }
 
-    if (kb25_cpi_active && !layer_state_is(6)) {
-        keyball_set_cpi(DEFAULT_CPI);
-        kb25_cpi_active = false;
+    if (kb25_cpi_active) {
+        if (layer_state_is(6)) {
+            kb25_seen_layer6 = true;
+        } else if (kb25_seen_layer6) {
+            keyball_set_cpi(DEFAULT_CPI);
+            kb25_cpi_active = false;
+            kb25_seen_layer6 = false;
+        }
     }
 
     if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23) {
@@ -441,8 +456,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
         // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
-        gesture_x += mouse_report.h * 55;
-        gesture_y -= mouse_report.v * 55;
+        gesture_x += mouse_report.h * 48;
+        gesture_y -= mouse_report.v * 48;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
