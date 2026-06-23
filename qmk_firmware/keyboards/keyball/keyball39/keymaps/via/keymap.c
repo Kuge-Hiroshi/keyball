@@ -257,10 +257,10 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb22 を離す  : Alt を離して選択を確定
 //
 // Kb23:
-//   Kb23 + 上    : アクティブウィンドウを必ず最大化 Win+Up x2。その後、候補選択モードへ
+//   Kb23 + 上    : アクティブウィンドウを必ず最大化 Alt+Space -> X。その後、候補選択モードへ
 //   Kb23 + 左    : アクティブウィンドウを左にスナップ Win+Left。その後、候補選択モードへ
 //   Kb23 + 右    : アクティブウィンドウを右にスナップ Win+Right。その後、候補選択モードへ
-//   Kb23 + 下    : アクティブウィンドウを必ず最小化 Win+Down x2
+//   Kb23 + 下    : アクティブウィンドウを必ず最小化 Alt+Space -> N
 //   候補選択モード中のボール操作 : 矢印キー
 //   Kb23 を離す : Enter で候補確定
 //
@@ -268,7 +268,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 180
+#define GESTURE_THRESHOLD 200
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
@@ -291,6 +291,24 @@ static void gesture_scrollsnap_begin(void) {
 
 static void gesture_scrollsnap_end(void) {
     keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
+}
+
+// アクティブウィンドウを最大化する。
+// Win+Up は Windows 11 のスナップ状態で上半分になることがあるため、
+// Alt+Space -> X を使う。
+static void send_window_maximize(void) {
+    tap_code16(A(KC_SPC));
+    wait_ms(80);
+    tap_code(KC_X);
+}
+
+// アクティブウィンドウを最小化する。
+// Win+Down は Windows 11 のスナップ状態で下半分/復元になることがあるため、
+// Alt+Space -> N を使う。
+static void send_window_minimize(void) {
+    tap_code16(A(KC_SPC));
+    wait_ms(80);
+    tap_code(KC_N);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -385,8 +403,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
         // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
-        gesture_x += mouse_report.h * 41;
-        gesture_y -= mouse_report.v * 41;
+        gesture_x += mouse_report.h * 48;
+        gesture_y -= mouse_report.v * 48;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
@@ -486,23 +504,19 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                     reset_gesture_amount();
                 }
             } else {
-                // 上: アクティブウィンドウを必ず最大化
-                // スナップ状態や通常状態に左右されにくいように Win+Up を2回送る
+                // 上: アクティブウィンドウを最大化
+                // Win+Up ではなく Alt+Space -> X を使う
                 // 上下操作では候補選択モードに入らない
                 if (gesture_y < -GESTURE_THRESHOLD) {
-                    tap_code16(G(KC_UP));
-                    wait_ms(30);
-                    tap_code16(G(KC_UP));
+                    send_window_maximize();
                     reset_gesture_amount();
                 }
 
-                // 下: アクティブウィンドウを必ず最小化
-                // 最大化状態では1回目で復元、2回目で最小化になるため Win+Down を2回送る
+                // 下: アクティブウィンドウを最小化
+                // Win+Down ではなく Alt+Space -> N を使う
                 // 上下操作では候補選択モードに入らない
                 if (gesture_y > GESTURE_THRESHOLD) {
-                    tap_code16(G(KC_DOWN));
-                    wait_ms(30);
-                    tap_code16(G(KC_DOWN));
+                    send_window_minimize();
                     reset_gesture_amount();
                 }
 
