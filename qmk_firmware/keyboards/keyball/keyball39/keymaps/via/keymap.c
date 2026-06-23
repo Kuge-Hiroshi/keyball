@@ -272,7 +272,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
-#define KB24_SCROLL_DIV    5  // Kb24: DIVを2段階下げる 7 -> 5
+#define KB24_SCROLL_DIV    9  // Kb24: DIVを2段階下げる 7 -> 5
 #define DEFAULT_CPI        5  // 5 = 500 CPI
 #define KB25_CPI           3  // Kb25: CPIを200下げる 500 -> 300
 
