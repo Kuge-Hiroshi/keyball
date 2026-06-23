@@ -236,6 +236,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 
 #endif  // COMBO_ENABLE
+// COMBO_ENABLE
 // ==============================
 // Kb21 / Kb22 + トラックボール ジェスチャー
 // ==============================
@@ -266,7 +267,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 150
+#define GESTURE_THRESHOLD 200
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
@@ -278,6 +279,16 @@ static int16_t gesture_y    = 0;
 static void reset_gesture_amount(void) {
     gesture_x = 0;
     gesture_y = 0;
+}
+
+// ジェスチャー中だけスクロールスナップを解除する。
+// 通常時は keyboard_post_init_user() と同じく縦スクロール固定に戻す。
+static void gesture_scrollsnap_begin(void) {
+    keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_FREE);
+}
+
+static void gesture_scrollsnap_end(void) {
+    keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -301,6 +312,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_21:
             gesture_mode_21 = record->event.pressed;
+            if (gesture_mode_21) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
             reset_gesture_amount();
             return false;
 
@@ -309,6 +325,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_22:
             gesture_mode_22 = record->event.pressed;
+            if (gesture_mode_22) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
 
             // Kb22 を離したら Alt を離して、選択中のアプリに確定する
             if (!gesture_mode_22 && alt_tab_active) {
@@ -324,6 +345,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_23:
             gesture_mode_23 = record->event.pressed;
+            if (gesture_mode_23) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
             reset_gesture_amount();
             return false;
     }
@@ -338,14 +364,11 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         gesture_y += mouse_report.y;
 
         // スクロールレイヤー用: h/v は値が小さいため倍率を掛ける
-        // 通常のスクロールレイヤーは縦固定のままにするが、
-        // Kb21/Kb22/Kb23 押下中だけは横方向 h もジェスチャー判定に使う。
+        // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
+        // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
         gesture_x += mouse_report.h * 16;
         gesture_y -= mouse_report.v * 16;
-
-        // 縦固定スクロール中でも、ジェスチャー中は物理ボールの横移動を拾えるように x も見る
-        gesture_x += mouse_report.x;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
@@ -456,4 +479,3 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 }
-
