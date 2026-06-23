@@ -257,10 +257,12 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb22 を離す  : Alt を離して選択を確定
 //
 // Kb23:
-//   Kb23 + 上    : アクティブウィンドウを最大化 Win+Up
-//   Kb23 + 左    : アクティブウィンドウを左にスナップ Win+Left
-//   Kb23 + 右    : アクティブウィンドウを右にスナップ Win+Right
+//   Kb23 + 上    : アクティブウィンドウを最大化 Win+Up。その後、候補選択モードへ
+//   Kb23 + 左    : アクティブウィンドウを左にスナップ Win+Left。その後、候補選択モードへ
+//   Kb23 + 右    : アクティブウィンドウを右にスナップ Win+Right。その後、候補選択モードへ
 //   Kb23 + 下    : アクティブウィンドウを最小化/復元 Win+Down
+//   候補選択モード中のボール操作 : 矢印キー
+//   Kb23 を離す : Enter で候補確定
 //
 
 // 感度を変えたい場合はこの数値を調整してください。
@@ -272,6 +274,7 @@ static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
 static bool gesture_mode_23 = false;
 static bool alt_tab_active  = false;
+static bool snap_assist_mode = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
 
@@ -348,6 +351,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 gesture_scrollsnap_begin();
             } else {
                 gesture_scrollsnap_end();
+
+                // Snap Assist の候補選択中なら、Kb23を離した時にEnterで確定する
+                if (snap_assist_mode) {
+                    tap_code(KC_ENT);
+                    snap_assist_mode = false;
+                }
             }
             reset_gesture_amount();
             return false;
@@ -445,28 +454,54 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
 
         if (gesture_mode_23) {
-            // 上: アクティブウィンドウを最大化
-            if (gesture_y < -GESTURE_THRESHOLD) {
-                tap_code16(G(KC_UP));
-                reset_gesture_amount();
-            }
+            if (snap_assist_mode) {
+                // Snap Assist の候補選択中は、ボール操作を矢印キーに変換する
+                if (gesture_y < -GESTURE_THRESHOLD) {
+                    tap_code(KC_UP);
+                    reset_gesture_amount();
+                }
 
-            // 下: アクティブウィンドウを最小化/復元
-            if (gesture_y > GESTURE_THRESHOLD) {
-                tap_code16(G(KC_DOWN));
-                reset_gesture_amount();
-            }
+                if (gesture_y > GESTURE_THRESHOLD) {
+                    tap_code(KC_DOWN);
+                    reset_gesture_amount();
+                }
 
-            // 右: アクティブウィンドウを右にスナップ
-            if (gesture_x > GESTURE_THRESHOLD) {
-                tap_code16(G(KC_RGHT));
-                reset_gesture_amount();
-            }
+                if (gesture_x > GESTURE_THRESHOLD) {
+                    tap_code(KC_RGHT);
+                    reset_gesture_amount();
+                }
 
-            // 左: アクティブウィンドウを左にスナップ
-            if (gesture_x < -GESTURE_THRESHOLD) {
-                tap_code16(G(KC_LEFT));
-                reset_gesture_amount();
+                if (gesture_x < -GESTURE_THRESHOLD) {
+                    tap_code(KC_LEFT);
+                    reset_gesture_amount();
+                }
+            } else {
+                // 上: アクティブウィンドウを最大化し、候補選択モードへ
+                if (gesture_y < -GESTURE_THRESHOLD) {
+                    tap_code16(G(KC_UP));
+                    snap_assist_mode = true;
+                    reset_gesture_amount();
+                }
+
+                // 下: アクティブウィンドウを最小化/復元
+                if (gesture_y > GESTURE_THRESHOLD) {
+                    tap_code16(G(KC_DOWN));
+                    reset_gesture_amount();
+                }
+
+                // 右: アクティブウィンドウを右にスナップし、候補選択モードへ
+                if (gesture_x > GESTURE_THRESHOLD) {
+                    tap_code16(G(KC_RGHT));
+                    snap_assist_mode = true;
+                    reset_gesture_amount();
+                }
+
+                // 左: アクティブウィンドウを左にスナップし、候補選択モードへ
+                if (gesture_x < -GESTURE_THRESHOLD) {
+                    tap_code16(G(KC_LEFT));
+                    snap_assist_mode = true;
+                    reset_gesture_amount();
+                }
             }
         }
     }
