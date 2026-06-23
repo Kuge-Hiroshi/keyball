@@ -270,11 +270,19 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
 #define GESTURE_THRESHOLD 200
 
+// Keyball 初期設定値
+#define DEFAULT_SCROLL_DIV 7
+#define KB24_SCROLL_DIV    5  // Kb24: DIVを2段階下げる 7 -> 5
+#define DEFAULT_CPI        5  // 5 = 500 CPI
+#define KB25_CPI           3  // Kb25: CPIを200下げる 500 -> 300
+
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
 static bool gesture_mode_23 = false;
 static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
+static bool kb24_scroll_div_active = false;
+static bool kb25_cpi_active = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
 
@@ -388,6 +396,24 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             reset_gesture_amount();
             return false;
+
+        // Remap の Kb 24
+        // 押下してからレイヤー3を一度離れるまで、スクロールDIVを2段階下げる
+        case QK_KB_24:
+            if (record->event.pressed) {
+                keyball_set_scroll_div(KB24_SCROLL_DIV);
+                kb24_scroll_div_active = true;
+            }
+            return false;
+
+        // Remap の Kb 25
+        // 押下してからレイヤー6を一度離れるまで、CPIを200下げる
+        case QK_KB_25:
+            if (record->event.pressed) {
+                keyball_set_cpi(KB25_CPI);
+                kb25_cpi_active = true;
+            }
+            return false;
     }
 
     return true;
@@ -403,8 +429,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
         // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
-        gesture_x += mouse_report.h * 48;
-        gesture_y -= mouse_report.v * 48;
+        gesture_x += mouse_report.h * 55;
+        gesture_y -= mouse_report.v * 55;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
