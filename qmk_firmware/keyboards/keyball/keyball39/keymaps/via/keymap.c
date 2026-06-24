@@ -257,14 +257,11 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb22 を離す  : Alt を離して選択を確定
 //
 // Kb23:
-//   Kb23 + 上    : アクティブウィンドウを必ず最大化 Alt+Space -> X。その後、候補選択モードへ
-//   Kb23 + 左    : アクティブウィンドウを左にスナップ Win+Left。その後、候補選択モードへ
-//   Kb23 + 右    : アクティブウィンドウを右にスナップ Win+Right。その後、候補選択モードへ
-//   Kb23 + 下    : アクティブウィンドウを必ず最小化 Alt+Space -> N
-//   候補選択モード中のボール操作 : 矢印キー
-//   Kb23 を離す : Enter で候補確定
+//   Kb23 + 上    : アクティブウィンドウを必ず最大化 Win+Up x2
+//   Kb23 + 下    : アクティブウィンドウを必ず最小化 Win+Down x2
+//   Kb23 + 右    : アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をEscでキャンセル
+//   Kb23 + 左    : アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をEscでキャンセル
 //
-
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
@@ -287,10 +284,26 @@ static bool kb24_seen_layer3 = false;
 static bool kb25_seen_layer6 = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
+static uint8_t current_scroll_div = DEFAULT_SCROLL_DIV;
+static uint8_t current_cpi = DEFAULT_CPI;
 
 static void reset_gesture_amount(void) {
     gesture_x = 0;
     gesture_y = 0;
+}
+
+static void set_scroll_div_once(uint8_t div) {
+    if (current_scroll_div != div) {
+        keyball_set_scroll_div(div);
+        current_scroll_div = div;
+    }
+}
+
+static void set_cpi_once(uint8_t cpi) {
+    if (current_cpi != cpi) {
+        keyball_set_cpi(cpi);
+        current_cpi = cpi;
+    }
 }
 
 // ジェスチャー中だけスクロールスナップを解除する。
@@ -304,33 +317,22 @@ static void gesture_scrollsnap_end(void) {
 }
 
 // アクティブウィンドウを最大化する。
-// Win+Up は Windows 11 のスナップ状態で上半分になることがあるため、
-// Alt+Space -> X を使う。
+// Win+Up を2回送ることで、スナップ状態からでも最大化に寄せる。
 static void send_window_maximize(void) {
-    tap_code16(A(KC_SPC));
-    wait_ms(80);
-    tap_code(KC_X);
+    tap_code16(G(KC_UP));
+    wait_ms(30);
+    tap_code16(G(KC_UP));
 }
 
 // アクティブウィンドウを最小化する。
-// Win+Down は Windows 11 のスナップ状態で下半分/復元になることがあるため、
-// Alt+Space -> N を使う。
+// Win+Down を2回送ることで、最大化/復元状態からでも最小化に寄せる。
 static void send_window_minimize(void) {
-    tap_code16(A(KC_SPC));
-    wait_ms(80);
-    tap_code(KC_N);
+    tap_code16(G(KC_DOWN));
+    wait_ms(30);
+    tap_code16(G(KC_DOWN));
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // Snap Assist 候補選択中は、通常のEnterでも確定できるようにする
-    if (snap_assist_mode && record->event.pressed && keycode == KC_ENT) {
-        snap_assist_mode = false;
-        gesture_mode_23 = false;
-        gesture_scrollsnap_end();
-        reset_gesture_amount();
-        return true;
-    }
-
     switch (keycode) {
 
         // Remap の Kb 20
@@ -390,11 +392,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             } else {
                 gesture_scrollsnap_end();
 
-                // Snap Assist の候補選択中なら、Kb23を離した時にEnterで確定する
-                if (snap_assist_mode) {
-                    tap_code(KC_ENT);
-                    snap_assist_mode = false;
-                }
+                // Kb23では候補選択を使わないため、離した時は状態だけクリアする
+                snap_assist_mode = false;
             }
             reset_gesture_amount();
             return false;
@@ -403,9 +402,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // 押下してからレイヤー3を一度離れるまで、スクロールDIVを9にする
         case QK_KB_24:
             if (record->event.pressed) {
-                keyball_set_scroll_div(KB24_SCROLL_DIV);
                 kb24_scroll_div_active = true;
                 kb24_seen_layer3 = layer_state_is(3);
+                set_scroll_div_once(KB24_SCROLL_DIV);
             }
             return false;
 
@@ -413,9 +412,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // 押下してからレイヤー6を一度離れるまで、CPIを200下げる
         case QK_KB_25:
             if (record->event.pressed) {
-                keyball_set_cpi(KB25_CPI);
                 kb25_cpi_active = true;
                 kb25_seen_layer6 = layer_state_is(6);
+                set_cpi_once(KB25_CPI);
             }
             return false;
     }
@@ -424,14 +423,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    // Kb24/Kb25 の一時変更は、対象レイヤーに一度入ったあと、
-    // その対象レイヤーを離れた時だけ元に戻す。
-    // これにより、Kb24だけ先に押してからレイヤー3へ入る使い方でも即解除されない。
+    // Kb24/Kb25 の一時変更を毎回監視する。
+    // Kb24はレイヤー3中、DIV 9を再適用することでスクロール側の上書きを避ける。
     if (kb24_scroll_div_active) {
         if (layer_state_is(3)) {
             kb24_seen_layer3 = true;
+            set_scroll_div_once(KB24_SCROLL_DIV);
         } else if (kb24_seen_layer3) {
-            keyball_set_scroll_div(DEFAULT_SCROLL_DIV);
+            set_scroll_div_once(DEFAULT_SCROLL_DIV);
             kb24_scroll_div_active = false;
             kb24_seen_layer3 = false;
         }
@@ -440,8 +439,9 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     if (kb25_cpi_active) {
         if (layer_state_is(6)) {
             kb25_seen_layer6 = true;
+            set_cpi_once(KB25_CPI);
         } else if (kb25_seen_layer6) {
-            keyball_set_cpi(DEFAULT_CPI);
+            set_cpi_once(DEFAULT_CPI);
             kb25_cpi_active = false;
             kb25_seen_layer6 = false;
         }
@@ -535,57 +535,36 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
 
         if (gesture_mode_23) {
-            if (snap_assist_mode) {
-                // Snap Assist の候補選択中は、ボール操作を矢印キーに変換する
-                if (gesture_y < -GESTURE_THRESHOLD) {
-                    tap_code(KC_UP);
-                    reset_gesture_amount();
-                }
+            // 上: アクティブウィンドウを必ず最大化
+            if (gesture_y < -GESTURE_THRESHOLD) {
+                send_window_maximize();
+                snap_assist_mode = false;
+                reset_gesture_amount();
+            }
 
-                if (gesture_y > GESTURE_THRESHOLD) {
-                    tap_code(KC_DOWN);
-                    reset_gesture_amount();
-                }
+            // 下: アクティブウィンドウを必ず最小化
+            if (gesture_y > GESTURE_THRESHOLD) {
+                send_window_minimize();
+                snap_assist_mode = false;
+                reset_gesture_amount();
+            }
 
-                if (gesture_x > GESTURE_THRESHOLD) {
-                    tap_code(KC_RGHT);
-                    reset_gesture_amount();
-                }
+            // 右: アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をキャンセル
+            if (gesture_x > GESTURE_THRESHOLD) {
+                tap_code16(G(KC_RGHT));
+                wait_ms(120);
+                tap_code(KC_ESC);
+                snap_assist_mode = false;
+                reset_gesture_amount();
+            }
 
-                if (gesture_x < -GESTURE_THRESHOLD) {
-                    tap_code(KC_LEFT);
-                    reset_gesture_amount();
-                }
-            } else {
-                // 上: アクティブウィンドウを最大化
-                // Win+Up ではなく Alt+Space -> X を使う
-                // 上下操作では候補選択モードに入らない
-                if (gesture_y < -GESTURE_THRESHOLD) {
-                    send_window_maximize();
-                    reset_gesture_amount();
-                }
-
-                // 下: アクティブウィンドウを最小化
-                // Win+Down ではなく Alt+Space -> N を使う
-                // 上下操作では候補選択モードに入らない
-                if (gesture_y > GESTURE_THRESHOLD) {
-                    send_window_minimize();
-                    reset_gesture_amount();
-                }
-
-                // 右: アクティブウィンドウを右半分へ移動し、候補選択モードへ
-                if (gesture_x > GESTURE_THRESHOLD) {
-                    tap_code16(G(KC_RGHT));
-                    snap_assist_mode = true;
-                    reset_gesture_amount();
-                }
-
-                // 左: アクティブウィンドウを左半分へ移動し、候補選択モードへ
-                if (gesture_x < -GESTURE_THRESHOLD) {
-                    tap_code16(G(KC_LEFT));
-                    snap_assist_mode = true;
-                    reset_gesture_amount();
-                }
+            // 左: アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をキャンセル
+            if (gesture_x < -GESTURE_THRESHOLD) {
+                tap_code16(G(KC_LEFT));
+                wait_ms(120);
+                tap_code(KC_ESC);
+                snap_assist_mode = false;
+                reset_gesture_amount();
             }
         }
     }
