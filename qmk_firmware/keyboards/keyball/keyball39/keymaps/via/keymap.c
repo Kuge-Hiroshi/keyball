@@ -257,8 +257,8 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb22 を離す  : Alt を離して選択を確定
 //
 // Kb23:
-//   Kb23 + 上    : アクティブウィンドウを必ず最大化 Win+Up x2
-//   Kb23 + 下    : アクティブウィンドウを必ず最小化 Win+Down x2
+//   Kb23 + 上    : Alt+Space -> X で最大化
+//   Kb23 + 下    : Alt+Space -> N で最小化
 //   Kb23 + 右    : アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をEscでキャンセル
 //   Kb23 + 左    : アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をEscでキャンセル
 //
@@ -269,7 +269,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
-#define KB24_SCROLL_DIV    5  // Kb24: DIVを5にする 7 -> 5
+#define KB24_SCROLL_DIV    5  // Kb24: DIVを9にする 7 -> 5
 #define DEFAULT_CPI        5  // 5 = 500 CPI
 #define KB25_CPI           3  // Kb25: CPIを200下げる 500 -> 300
 
@@ -317,19 +317,19 @@ static void gesture_scrollsnap_end(void) {
 }
 
 // アクティブウィンドウを最大化する。
-// Win+Up を2回送ることで、スナップ状態からでも最大化に寄せる。
+// PowerToys Run のショートカットを変更する前提で Alt+Space -> X を使う。
 static void send_window_maximize(void) {
-    tap_code16(G(KC_UP));
-    wait_ms(30);
-    tap_code16(G(KC_UP));
+    tap_code16(A(KC_SPC));
+    wait_ms(80);
+    tap_code(KC_X);
 }
 
 // アクティブウィンドウを最小化する。
-// Win+Down を2回送ることで、最大化/復元状態からでも最小化に寄せる。
+// PowerToys Run のショートカットを変更する前提で Alt+Space -> N を使う。
 static void send_window_minimize(void) {
-    tap_code16(G(KC_DOWN));
-    wait_ms(30);
-    tap_code16(G(KC_DOWN));
+    tap_code16(A(KC_SPC));
+    wait_ms(80);
+    tap_code(KC_N);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -456,8 +456,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
         // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
-        gesture_x += mouse_report.h * 60;
-        gesture_y -= mouse_report.v * 60;
+        gesture_x += mouse_report.h * 65;
+        gesture_y -= mouse_report.v * 65;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
