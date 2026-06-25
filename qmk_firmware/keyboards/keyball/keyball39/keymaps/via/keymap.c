@@ -273,19 +273,15 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb27 + 下    : ↓
 //   Kb27 + 左    : ←
 //   Kb27 + 右    : →
-//
-//
 // Kb28:
 //   Kb28 + 上    : 新規タブ Ctrl+T
 //   Kb28 + 下    : 現在のタブを閉じる Ctrl+W
 //   Kb28 + 左    : 左のタブへ Ctrl+Shift+Tab
 //   Kb28 + 右    : 右のタブへ Ctrl+Tab
-//
-
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 200
+#define GESTURE_THRESHOLD 210
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
@@ -631,6 +627,84 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 wait_ms(120);
                 tap_code(KC_ESC);
                 snap_assist_mode = false;
+                reset_gesture_amount();
+            }
+        }
+
+        if (gesture_mode_26) {
+            // 上: 音量アップ
+            if (gesture_y < -GESTURE_THRESHOLD) {
+                tap_code(KC_VOLU);
+                reset_gesture_amount();
+            }
+
+            // 下: 音量ダウン
+            if (gesture_y > GESTURE_THRESHOLD) {
+                tap_code(KC_VOLD);
+                reset_gesture_amount();
+            }
+
+            // 右: ミュート切替
+            if (gesture_x > GESTURE_THRESHOLD) {
+                tap_code(KC_MUTE);
+                reset_gesture_amount();
+            }
+
+            // 左: ミュート切替
+            if (gesture_x < -GESTURE_THRESHOLD) {
+                tap_code(KC_MUTE);
+                reset_gesture_amount();
+            }
+        }
+
+        if (gesture_mode_27) {
+            // 上: ↑
+            if (gesture_y < -GESTURE27_Y_THRESHOLD) {
+                tap_code(KC_UP);
+                reset_gesture_amount();
+            }
+
+            // 下: ↓
+            if (gesture_y > GESTURE27_Y_THRESHOLD) {
+                tap_code(KC_DOWN);
+                reset_gesture_amount();
+            }
+
+            // 右: →
+            if (gesture_x > GESTURE27_X_THRESHOLD) {
+                tap_code(KC_RGHT);
+                reset_gesture_amount();
+            }
+
+            // 左: ←
+            if (gesture_x < -GESTURE27_X_THRESHOLD) {
+                tap_code(KC_LEFT);
+                reset_gesture_amount();
+            }
+        }
+
+        if (gesture_mode_28) {
+            // 上: 新規タブ Ctrl+T
+            if (gesture_y < -GESTURE_THRESHOLD) {
+                tap_code16(C(KC_T));
+                reset_gesture_amount();
+            }
+
+            // 下: 現在のタブを閉じる Ctrl+W
+            if (gesture_y > GESTURE_THRESHOLD) {
+                tap_code16(C(KC_W));
+                reset_gesture_amount();
+            }
+
+            // 右: 右のタブへ Ctrl+Tab
+            if (gesture_x > GESTURE_THRESHOLD) {
+                tap_code16(C(KC_TAB));
+                reset_gesture_amount();
+            }
+
+            // 左: 左のタブへ Ctrl+Shift+Tab
+            if (gesture_x < -GESTURE_THRESHOLD) {
+                tap_code16(C(S(KC_TAB)));
                 reset_gesture_amount();
             }
         }
