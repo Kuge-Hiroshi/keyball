@@ -274,10 +274,18 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb27 + 左    : ←
 //   Kb27 + 右    : →
 //
+//
+// Kb28:
+//   Kb28 + 上    : 新規タブ Ctrl+T
+//   Kb28 + 下    : 現在のタブを閉じる Ctrl+W
+//   Kb28 + 左    : 左のタブへ Ctrl+Shift+Tab
+//   Kb28 + 右    : 右のタブへ Ctrl+Tab
+//
+
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 220
+#define GESTURE_THRESHOLD 200
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
@@ -295,6 +303,7 @@ static bool gesture_mode_22 = false;
 static bool gesture_mode_23 = false;
 static bool gesture_mode_26 = false;
 static bool gesture_mode_27 = false;
+static bool gesture_mode_28 = false;
 static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
 static bool kb24_scroll_div_active = false;
@@ -462,6 +471,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             reset_gesture_amount();
             return false;
+
+        // Remap の Kb 28
+        // トラックボール操作をブラウザのタブ操作に変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
+        case QK_KB_28:
+            gesture_mode_28 = record->event.pressed;
+            if (gesture_mode_28) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
+            reset_gesture_amount();
+            return false;
     }
 
     return true;
@@ -492,7 +514,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
     }
 
-    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27) {
+    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27 || gesture_mode_28) {
         // 通常レイヤーでは x/y、スクロールレイヤーでは h/v に変換されるため、両方をジェスチャー量に加算する
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
