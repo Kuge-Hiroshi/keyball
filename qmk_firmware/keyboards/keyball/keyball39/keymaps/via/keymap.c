@@ -72,6 +72,12 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     RGB_RMOD , RGB_HUD  , RGB_SAD  , RGB_VAD  , SCRL_DVD ,                            CPI_D1K  , CPI_D100 , CPI_I100 , CPI_I1K  , KBC_SAVE ,
     QK_BOOT  , KBC_RST  , _______  , _______  , _______  , _______  ,      _______  , _______  , _______  , _______  , KBC_RST  , QK_BOOT
   ),
+  [7] = LAYOUT_universal(
+    RGB_TOG  , AML_TO   , AML_I50  , AML_D50  , _______  ,                            _______  , _______  , SSNP_HOR , SSNP_VRT , SSNP_FRE ,
+    RGB_MOD  , RGB_HUI  , RGB_SAI  , RGB_VAI  , SCRL_DVI ,                            _______  , _______  , _______  , _______  , _______  ,
+    RGB_RMOD , RGB_HUD  , RGB_SAD  , RGB_VAD  , SCRL_DVD ,                            CPI_D1K  , CPI_D100 , CPI_I100 , CPI_I1K  , KBC_SAVE ,
+    QK_BOOT  , KBC_RST  , _______  , _______  , _______  , _______  ,      _______  , _______  , _______  , _______  , KBC_RST  , QK_BOOT
+  ),
 };
 // clang-format on
 
@@ -262,10 +268,21 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 //   Kb23 + 右    : アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をEscでキャンセル
 //   Kb23 + 左    : アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をEscでキャンセル
 //
+// Kb27:
+//   Kb27 + 上    : ↑
+//   Kb27 + 下    : ↓
+//   Kb27 + 左    : ←
+//   Kb27 + 右    : →
+//
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 200
+#define GESTURE_THRESHOLD 220
+
+// Kb27専用の矢印キー用しきい値
+// 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
+#define GESTURE27_X_THRESHOLD 600
+#define GESTURE27_Y_THRESHOLD 500
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
@@ -276,6 +293,8 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
 static bool gesture_mode_23 = false;
+static bool gesture_mode_26 = false;
+static bool gesture_mode_27 = false;
 static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
 static bool kb24_scroll_div_active = false;
@@ -417,6 +436,32 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 set_cpi_once(KB25_CPI);
             }
             return false;
+
+        // Remap の Kb 26
+        // トラックボール操作を音量操作に変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
+        case QK_KB_26:
+            gesture_mode_26 = record->event.pressed;
+            if (gesture_mode_26) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
+            reset_gesture_amount();
+            return false;
+
+        // Remap の Kb 27
+        // トラックボール操作を矢印キーに変換する
+        // レイヤー3のスクロールレイヤー中でも使用可能
+        case QK_KB_27:
+            gesture_mode_27 = record->event.pressed;
+            if (gesture_mode_27) {
+                gesture_scrollsnap_begin();
+            } else {
+                gesture_scrollsnap_end();
+            }
+            reset_gesture_amount();
+            return false;
     }
 
     return true;
@@ -447,7 +492,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
     }
 
-    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23) {
+    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27) {
         // 通常レイヤーでは x/y、スクロールレイヤーでは h/v に変換されるため、両方をジェスチャー量に加算する
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
@@ -456,8 +501,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
         // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
         // v は通常の y と上下が逆になるため、符号を反転する。
-        gesture_x += mouse_report.h * 65;
-        gesture_y -= mouse_report.v * 65;
+        gesture_x += mouse_report.h * 48;
+        gesture_y -= mouse_report.v * 48;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         mouse_report.x = 0;
