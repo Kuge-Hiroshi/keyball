@@ -135,6 +135,8 @@ enum combo_events {
   DOUBLE_QUOTE,
   EXCLAMATION,
   YEN_MARK,
+  END_KEY,
+  HOME_KEY,
   COMBO_COUNT
 };
 
@@ -150,6 +152,8 @@ const uint16_t PROGMEM colon_combo[] = {KC_F, KC_D, COMBO_END};
 const uint16_t PROGMEM singleq_combo[] = {KC_C, KC_V, COMBO_END};
 const uint16_t PROGMEM doubleq_combo[] = {KC_C, KC_X, COMBO_END};
 const uint16_t PROGMEM yen_combo[] = {KC_E, KC_W, COMBO_END};
+const uint16_t PROGMEM end_combo[]  = {KC_Q, KC_W, COMBO_END};
+const uint16_t PROGMEM home_combo[] = {KC_O, KC_P, COMBO_END};
 
 combo_t key_combos[COMBO_COUNT] = {
   [PARENTHESES] = COMBO_ACTION(paren_combo),
@@ -164,6 +168,8 @@ combo_t key_combos[COMBO_COUNT] = {
   [SINGLE_QUOTE] = COMBO_ACTION(singleq_combo),
   [DOUBLE_QUOTE] = COMBO_ACTION(doubleq_combo),
   [YEN_MARK] = COMBO_ACTION(yen_combo)
+  [END_KEY]  = COMBO_ACTION(end_combo),
+  [HOME_KEY] = COMBO_ACTION(home_combo)
 };
 // COMBO_ACTION(x) is same as COMBO(x, KC_NO)
 
@@ -235,6 +241,17 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
     case YEN_MARK:
       if (pressed) {
         tap_code16(KC_BSLS);
+      }
+      break;
+        case END_KEY:
+      if (pressed) {
+        tap_code(KC_END);
+      }
+      break;
+
+    case HOME_KEY:
+      if (pressed) {
+        tap_code(KC_HOME);
       }
       break;
   }
