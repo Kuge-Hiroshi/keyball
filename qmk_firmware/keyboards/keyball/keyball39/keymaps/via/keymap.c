@@ -167,7 +167,7 @@ combo_t key_combos[COMBO_COUNT] = {
   [COLON] = COMBO_ACTION(colon_combo),
   [SINGLE_QUOTE] = COMBO_ACTION(singleq_combo),
   [DOUBLE_QUOTE] = COMBO_ACTION(doubleq_combo),
-  [YEN_MARK] = COMBO_ACTION(yen_combo)
+  [YEN_MARK] = COMBO_ACTION(yen_combo),
   [END_KEY]  = COMBO_ACTION(end_combo),
   [HOME_KEY] = COMBO_ACTION(home_combo)
 };
