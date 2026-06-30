@@ -97,7 +97,7 @@ void keyboard_post_init_user(void) {
     keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
 
     // CPI = 600
-    set_cpi_once(DEFAULT_CPI);
+    keyball_set_cpi(6);
 
     // スクロール速度 = 7
     keyball_set_scroll_div(7);
@@ -308,7 +308,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
 #define KB24_SCROLL_DIV    5  // Kb24: DIVを9にする 7 -> 5
-#define DEFAULT_CPI        6  // 600 CPI
+#define DEFAULT_CPI        6  // 700 CPI
 #define LAYER6_CPI         5  // 500 CPI
 #define KB25_CPI           4  // Kb25: レイヤー6中に押すと400 CPI
 
