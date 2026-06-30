@@ -96,8 +96,8 @@ void keyboard_post_init_user(void) {
     // 縦スクロール固定
     keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
 
-    // CPI = 500
-    keyball_set_cpi(5);
+    // CPI = 700
+    keyball_set_cpi(7);
 
     // スクロール速度 = 7
     keyball_set_scroll_div(7);
@@ -308,8 +308,9 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
 #define KB24_SCROLL_DIV    5  // Kb24: DIVを9にする 7 -> 5
-#define DEFAULT_CPI        5  // 5 = 500 CPI
-#define KB25_CPI           3  // Kb25: CPIを200下げる 500 -> 300
+#define DEFAULT_CPI        7  // 700 CPI
+#define LAYER6_CPI         5  // 500 CPI
+#define KB25_CPI           3  // Kb25: レイヤー6中に押すと300 CPI
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
@@ -516,15 +517,24 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
     }
 
+    // CPI制御
+    // 通常: 700
+    // レイヤー6: 500
+    // レイヤー6中にKb25押下後: レイヤー6を抜けるまで300
     if (kb25_cpi_active) {
         if (layer_state_is(6)) {
             kb25_seen_layer6 = true;
             set_cpi_once(KB25_CPI);
         } else if (kb25_seen_layer6) {
-            set_cpi_once(DEFAULT_CPI);
             kb25_cpi_active = false;
             kb25_seen_layer6 = false;
+            set_cpi_once(DEFAULT_CPI);
+        } else {
+            kb25_cpi_active = false;
+            set_cpi_once(layer_state_is(6) ? LAYER6_CPI : DEFAULT_CPI);
         }
+    } else {
+        set_cpi_once(layer_state_is(6) ? LAYER6_CPI : DEFAULT_CPI);
     }
 
     if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27 || gesture_mode_28) {
