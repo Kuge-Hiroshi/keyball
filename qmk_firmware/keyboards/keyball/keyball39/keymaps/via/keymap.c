@@ -302,8 +302,8 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
-#define GESTURE27_X_THRESHOLD 1500
-#define GESTURE27_Y_THRESHOLD 1250
+#define GESTURE27_X_THRESHOLD 300
+#define GESTURE27_Y_THRESHOLD 250
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
