@@ -298,17 +298,17 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 230
+#define GESTURE_THRESHOLD 250
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
-#define GESTURE27_X_THRESHOLD 900
-#define GESTURE27_Y_THRESHOLD 750
+#define GESTURE27_X_THRESHOLD 1200
+#define GESTURE27_Y_THRESHOLD 1000
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
 #define KB24_SCROLL_DIV    5  // Kb24: DIVを5にする
-#define DEFAULT_CPI        8  // 800 CPI
+#define DEFAULT_CPI        7  // 700 CPI
 #define LAYER6_CPI         5  // 500 CPI
 #define KB25_CPI           2  // Kb25: レイヤー6中に押すと200 CPI
 
