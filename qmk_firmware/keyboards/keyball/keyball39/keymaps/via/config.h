@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DYNAMIC_KEYMAP_LAYER_COUNT 8
 
 #define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
-#define TAPPING_TERM 180
+#define TAPPING_TERM 150
 #define QUICK_TAP_TERM 120 
 #define AUTO_MOUSE_LAYER_KEEP_TIME 30000  // AML保持時間
 

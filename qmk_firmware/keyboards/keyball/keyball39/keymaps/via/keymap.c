@@ -298,19 +298,19 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 感度を変えたい場合はこの数値を調整してください。
 // 小さいほど少しのボール移動で反応します。
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
-#define GESTURE_THRESHOLD 210
+#define GESTURE_THRESHOLD 230
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
-#define GESTURE27_X_THRESHOLD 600
-#define GESTURE27_Y_THRESHOLD 500
+#define GESTURE27_X_THRESHOLD 900
+#define GESTURE27_Y_THRESHOLD 750
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
-#define KB24_SCROLL_DIV    5  // Kb24: DIVを9にする 7 -> 5
-#define DEFAULT_CPI        6  // 700 CPI
+#define KB24_SCROLL_DIV    5  // Kb24: DIVを5にする
+#define DEFAULT_CPI        8  // 800 CPI
 #define LAYER6_CPI         5  // 500 CPI
-#define KB25_CPI           4  // Kb25: レイヤー6中に押すと400 CPI
+#define KB25_CPI           2  // Kb25: レイヤー6中に押すと200 CPI
 
 static bool gesture_mode_21 = false;
 static bool gesture_mode_22 = false;
@@ -356,22 +356,6 @@ static void gesture_scrollsnap_begin(void) {
 
 static void gesture_scrollsnap_end(void) {
     keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_VERTICAL);
-}
-
-// アクティブウィンドウを最大化する。
-// PowerToys Run のショートカットを変更する前提で Alt+Space -> X を使う。
-static void send_window_maximize(void) {
-    tap_code16(A(KC_SPC));
-    wait_ms(80);
-    tap_code(KC_X);
-}
-
-// アクティブウィンドウを最小化する。
-// PowerToys Run のショートカットを変更する前提で Alt+Space -> N を使う。
-static void send_window_minimize(void) {
-    tap_code16(A(KC_SPC));
-    wait_ms(80);
-    tap_code(KC_N);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -625,16 +609,20 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
 
         if (gesture_mode_23) {
-            // 上: アクティブウィンドウを必ず最大化
+            // 上: Win+↑ -> Esc
             if (gesture_y < -GESTURE_THRESHOLD) {
-                send_window_maximize();
+                tap_code16(G(KC_UP));
+                wait_ms(120);
+                tap_code(KC_ESC);
                 snap_assist_mode = false;
                 reset_gesture_amount();
             }
 
-            // 下: アクティブウィンドウを必ず最小化
+            // 下: Win+↓ -> Esc
             if (gesture_y > GESTURE_THRESHOLD) {
-                send_window_minimize();
+                tap_code16(G(KC_DOWN));
+                wait_ms(120);
+                tap_code(KC_ESC);
                 snap_assist_mode = false;
                 reset_gesture_amount();
             }
