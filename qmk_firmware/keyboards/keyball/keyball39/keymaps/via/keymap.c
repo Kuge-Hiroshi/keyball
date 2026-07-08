@@ -308,8 +308,8 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
 #define KB24_SCROLL_DIV    5  // Kb24: DIVを5にする
-#define DEFAULT_CPI        7  // 700 CPI
-#define LAYER6_CPI         5  // 500 CPI
+#define DEFAULT_CPI        6  // 600 CPI
+#define LAYER6_CPI         4  // 400 CPI
 #define KB25_CPI           2  // Kb25: レイヤー6中に押すと200 CPI
 
 static bool gesture_mode_21 = false;
