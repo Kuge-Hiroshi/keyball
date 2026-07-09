@@ -320,6 +320,8 @@ static bool gesture_mode_27 = false;
 static bool gesture_mode_28 = false;
 static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
+// Kb22: 発火後、ボールが止まるまで再発火しないための待機フラグ
+static bool gesture22_wait_for_stop = false;
 // Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
 static bool gesture23_wait_for_stop = false;
 static bool kb24_scroll_div_active = false;
@@ -396,8 +398,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             gesture_mode_22 = record->event.pressed;
             if (gesture_mode_22) {
                 gesture_scrollsnap_begin();
+                gesture22_wait_for_stop = false;
             } else {
                 gesture_scrollsnap_end();
+                gesture22_wait_for_stop = false;
             }
 
             // Kb22 を離したら Alt を離して、選択中のアプリに確定する
@@ -526,17 +530,22 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     }
 
     if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27 || gesture_mode_28) {
-        // Kb23用: 発火後は、ボールが止まるまで移動量を無視する
+        // Kb22/Kb23用: 発火後は、ボールが止まるまで移動量を無視する
         // h/v はスクロールレイヤーで使われるため、x/y と合わせて停止判定する
-        bool gesture23_ball_stopped = (mouse_report.x == 0 && mouse_report.y == 0 && mouse_report.h == 0 && mouse_report.v == 0);
+        bool gesture_ball_stopped = (mouse_report.x == 0 && mouse_report.y == 0 && mouse_report.h == 0 && mouse_report.v == 0);
 
-        if (gesture_mode_23 && gesture23_wait_for_stop) {
-            if (gesture23_ball_stopped) {
-                gesture23_wait_for_stop = false;
+        if ((gesture_mode_22 && gesture22_wait_for_stop) || (gesture_mode_23 && gesture23_wait_for_stop)) {
+            if (gesture_ball_stopped) {
+                if (gesture_mode_22) {
+                    gesture22_wait_for_stop = false;
+                }
+                if (gesture_mode_23) {
+                    gesture23_wait_for_stop = false;
+                }
             }
             reset_gesture_amount();
 
-            // Kb23待機中もカーソル移動やスクロールを発生させない
+            // 待機中もカーソル移動やスクロールを発生させない
             mouse_report.x = 0;
             mouse_report.y = 0;
             mouse_report.h = 0;
@@ -594,6 +603,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 register_code(KC_LALT);
                 tap_code(KC_TAB);
                 alt_tab_active = true;
+                gesture22_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -614,18 +624,21 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                     tap_code(KC_F4);
                     unregister_code(KC_LALT);
                 }
+                gesture22_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
             // 右: 次のアプリへ
             if (gesture_x > GESTURE_THRESHOLD && alt_tab_active) {
                 tap_code(KC_TAB);
+                gesture22_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
             // 左: 前のアプリへ
             if (gesture_x < -GESTURE_THRESHOLD && alt_tab_active) {
                 tap_code16(S(KC_TAB));
+                gesture22_wait_for_stop = true;
                 reset_gesture_amount();
             }
         }
