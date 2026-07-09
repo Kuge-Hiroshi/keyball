@@ -302,8 +302,8 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
-#define GESTURE27_X_THRESHOLD 300
-#define GESTURE27_Y_THRESHOLD 250
+#define GESTURE27_X_THRESHOLD 150
+#define GESTURE27_Y_THRESHOLD 125
 
 // Keyball 初期設定値
 #define DEFAULT_SCROLL_DIV 7
@@ -320,6 +320,8 @@ static bool gesture_mode_27 = false;
 static bool gesture_mode_28 = false;
 static bool alt_tab_active  = false;
 static bool snap_assist_mode = false;
+// Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
+static bool gesture23_wait_for_stop = false;
 static bool kb24_scroll_div_active = false;
 static bool kb25_cpi_active = false;
 static bool kb24_seen_layer3 = false;
@@ -415,11 +417,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             gesture_mode_23 = record->event.pressed;
             if (gesture_mode_23) {
                 gesture_scrollsnap_begin();
+                gesture23_wait_for_stop = false;
             } else {
                 gesture_scrollsnap_end();
 
                 // Kb23では候補選択を使わないため、離した時は状態だけクリアする
                 snap_assist_mode = false;
+                gesture23_wait_for_stop = false;
             }
             reset_gesture_amount();
             return false;
@@ -522,6 +526,24 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     }
 
     if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27 || gesture_mode_28) {
+        // Kb23用: 発火後は、ボールが止まるまで移動量を無視する
+        // h/v はスクロールレイヤーで使われるため、x/y と合わせて停止判定する
+        bool gesture23_ball_stopped = (mouse_report.x == 0 && mouse_report.y == 0 && mouse_report.h == 0 && mouse_report.v == 0);
+
+        if (gesture_mode_23 && gesture23_wait_for_stop) {
+            if (gesture23_ball_stopped) {
+                gesture23_wait_for_stop = false;
+            }
+            reset_gesture_amount();
+
+            // Kb23待機中もカーソル移動やスクロールを発生させない
+            mouse_report.x = 0;
+            mouse_report.y = 0;
+            mouse_report.h = 0;
+            mouse_report.v = 0;
+            return mouse_report;
+        }
+
         // 通常レイヤーでは x/y、スクロールレイヤーでは h/v に変換されるため、両方をジェスチャー量に加算する
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
@@ -615,6 +637,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 wait_ms(120);
                 tap_code(KC_ESC);
                 snap_assist_mode = false;
+                gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -624,6 +647,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 wait_ms(120);
                 tap_code(KC_ESC);
                 snap_assist_mode = false;
+                gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -633,6 +657,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 wait_ms(120);
                 tap_code(KC_ESC);
                 snap_assist_mode = false;
+                gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -642,6 +667,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 wait_ms(120);
                 tap_code(KC_ESC);
                 snap_assist_mode = false;
+                gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
         }
