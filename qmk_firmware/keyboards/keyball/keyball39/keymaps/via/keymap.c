@@ -1,3 +1,8 @@
+ライブラリ
+/
+keymap_kb30_kb31_lang_mod_compact.c
+
+
 /*
 Copyright 2022 @Yowkees
 Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
@@ -414,99 +419,85 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
     reset_gesture_amount();
 }
 
-typedef struct {
-    bool pressed;
-    bool hold_active;
-    uint16_t pressed_at;
-    uint16_t tap_keycode;
-    uint8_t hold_keycode;
-} kb_lang_mod_state_t;
+#define KB30_PRESSED  (1U << 0)
+#define KB30_HOLD     (1U << 1)
+#define KB31_PRESSED  (1U << 2)
+#define KB31_HOLD     (1U << 3)
 
-static kb_lang_mod_state_t kb30_state = {
-    .tap_keycode = KC_LNG1,
-    .hold_keycode = KC_LCTL,
-};
-
-static kb_lang_mod_state_t kb31_state = {
-    .tap_keycode = KC_LNG2,
-    .hold_keycode = KC_LSFT,
-};
-
-static kb_lang_mod_state_t *get_kb_lang_mod_state(uint16_t keycode) {
-    switch (keycode) {
-        case QK_KB_30:
-            return &kb30_state;
-        case QK_KB_31:
-            return &kb31_state;
-        default:
-            return NULL;
-    }
-}
-
-static bool is_kb_lang_mod(uint16_t keycode) {
-    return keycode == QK_KB_30 || keycode == QK_KB_31;
-}
-
-static void activate_kb_lang_mod_hold(kb_lang_mod_state_t *state) {
-    if (state->pressed && !state->hold_active) {
-        register_code(state->hold_keycode);
-        state->hold_active = true;
-    }
-}
+static uint8_t kb_lang_mod_flags = 0;
+static uint16_t kb30_pressed_at = 0;
+static uint16_t kb31_pressed_at = 0;
 
 static void activate_pending_kb_lang_mod_holds(void) {
-    activate_kb_lang_mod_hold(&kb30_state);
-    activate_kb_lang_mod_hold(&kb31_state);
-}
-
-static bool process_kb_lang_mod(uint16_t keycode, keyrecord_t *record) {
-    kb_lang_mod_state_t *state = get_kb_lang_mod_state(keycode);
-
-    if (state == NULL) {
-        return true;
+    if ((kb_lang_mod_flags & KB30_PRESSED) &&
+        !(kb_lang_mod_flags & KB30_HOLD)) {
+        register_code(KC_LCTL);
+        kb_lang_mod_flags |= KB30_HOLD;
     }
 
-    if (record->event.pressed) {
-        state->pressed = true;
-        state->hold_active = false;
-        state->pressed_at = timer_read();
-    } else {
-        if (state->hold_active) {
-            unregister_code(state->hold_keycode);
-        } else if (timer_elapsed(state->pressed_at) < THUMB_HOLD_TERM) {
-            tap_code16(state->tap_keycode);
-        }
-
-        state->pressed = false;
-        state->hold_active = false;
+    if ((kb_lang_mod_flags & KB31_PRESSED) &&
+        !(kb_lang_mod_flags & KB31_HOLD)) {
+        register_code(KC_LSFT);
+        kb_lang_mod_flags |= KB31_HOLD;
     }
-
-    return false;
 }
 
 // 100ms以上押したら、他キー入力がなくてもCtrl/Shiftとして確定する
 void matrix_scan_user(void) {
-    if (kb30_state.pressed && !kb30_state.hold_active &&
-        timer_elapsed(kb30_state.pressed_at) >= THUMB_HOLD_TERM) {
-        activate_kb_lang_mod_hold(&kb30_state);
+    if ((kb_lang_mod_flags & KB30_PRESSED) &&
+        !(kb_lang_mod_flags & KB30_HOLD) &&
+        timer_elapsed(kb30_pressed_at) >= THUMB_HOLD_TERM) {
+        register_code(KC_LCTL);
+        kb_lang_mod_flags |= KB30_HOLD;
     }
 
-    if (kb31_state.pressed && !kb31_state.hold_active &&
-        timer_elapsed(kb31_state.pressed_at) >= THUMB_HOLD_TERM) {
-        activate_kb_lang_mod_hold(&kb31_state);
+    if ((kb_lang_mod_flags & KB31_PRESSED) &&
+        !(kb_lang_mod_flags & KB31_HOLD) &&
+        timer_elapsed(kb31_pressed_at) >= THUMB_HOLD_TERM) {
+        register_code(KC_LSFT);
+        kb_lang_mod_flags |= KB31_HOLD;
     }
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // Kb30/Kb31を押しながら別キーを押した瞬間にCtrl/Shiftへ確定する。
-    if (record->event.pressed && !is_kb_lang_mod(keycode)) {
+    if (record->event.pressed &&
+        keycode != QK_KB_30 && keycode != QK_KB_31) {
         activate_pending_kb_lang_mod_holds();
     }
 
-    if (is_kb_lang_mod(keycode)) {
-        return process_kb_lang_mod(keycode, record);
-    }
     switch (keycode) {
+        // Remap Kb30: tap=Lang1 / hold=Ctrl
+        case QK_KB_30:
+            if (record->event.pressed) {
+                kb30_pressed_at = timer_read();
+                kb_lang_mod_flags =
+                    (kb_lang_mod_flags | KB30_PRESSED) & ~KB30_HOLD;
+            } else {
+                if (kb_lang_mod_flags & KB30_HOLD) {
+                    unregister_code(KC_LCTL);
+                } else if (timer_elapsed(kb30_pressed_at) < THUMB_HOLD_TERM) {
+                    tap_code(KC_LNG1);
+                }
+                kb_lang_mod_flags &= ~(KB30_PRESSED | KB30_HOLD);
+            }
+            return false;
+
+        // Remap Kb31: tap=Lang2 / hold=Shift
+        case QK_KB_31:
+            if (record->event.pressed) {
+                kb31_pressed_at = timer_read();
+                kb_lang_mod_flags =
+                    (kb_lang_mod_flags | KB31_PRESSED) & ~KB31_HOLD;
+            } else {
+                if (kb_lang_mod_flags & KB31_HOLD) {
+                    unregister_code(KC_LSFT);
+                } else if (timer_elapsed(kb31_pressed_at) < THUMB_HOLD_TERM) {
+                    tap_code(KC_LNG2);
+                }
+                kb_lang_mod_flags &= ~(KB31_PRESSED | KB31_HOLD);
+            }
+            return false;
 
         // Remap の Kb 20
         // レイヤー3中だけ、押している間は横スクロールにする
