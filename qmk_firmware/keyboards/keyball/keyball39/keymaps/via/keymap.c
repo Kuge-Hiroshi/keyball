@@ -345,6 +345,13 @@ static void reset_gesture_amount(void) {
     gesture_y = 0;
 }
 
+static void clear_mouse_report(report_mouse_t *report) {
+    report->x = 0;
+    report->y = 0;
+    report->h = 0;
+    report->v = 0;
+}
+
 static void set_scroll_div_once(uint8_t div) {
     if (current_scroll_div != div) {
         keyball_set_scroll_div(div);
@@ -414,43 +421,32 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
     reset_gesture_amount();
 }
 
-#define KB30_PRESSED  (1U << 0)
-#define KB30_HOLD     (1U << 1)
-#define KB31_PRESSED  (1U << 2)
-#define KB31_HOLD     (1U << 3)
+#define KB_LANG_PRESSED 0x01
+#define KB_LANG_HOLD    0x02
 
-static uint8_t kb_lang_mod_flags = 0;
-static uint16_t kb30_pressed_at = 0;
-static uint16_t kb31_pressed_at = 0;
+static uint8_t kb_lang_flags[2] = {0, 0};
+static uint16_t kb_lang_pressed_at[2] = {0, 0};
 
-static void activate_pending_kb_lang_mod_holds(void) {
-    if ((kb_lang_mod_flags & KB30_PRESSED) &&
-        !(kb_lang_mod_flags & KB30_HOLD)) {
-        register_code(KC_LCTL);
-        kb_lang_mod_flags |= KB30_HOLD;
-    }
-
-    if ((kb_lang_mod_flags & KB31_PRESSED) &&
-        !(kb_lang_mod_flags & KB31_HOLD)) {
-        register_code(KC_LSFT);
-        kb_lang_mod_flags |= KB31_HOLD;
+static void kb_lang_hold(uint8_t i) {
+    if ((kb_lang_flags[i] & KB_LANG_PRESSED) &&
+        !(kb_lang_flags[i] & KB_LANG_HOLD)) {
+        register_code(i ? KC_LSFT : KC_LCTL);
+        kb_lang_flags[i] |= KB_LANG_HOLD;
     }
 }
 
-// 100ms以上押したら、他キー入力がなくてもCtrl/Shiftとして確定する
-void matrix_scan_user(void) {
-    if ((kb_lang_mod_flags & KB30_PRESSED) &&
-        !(kb_lang_mod_flags & KB30_HOLD) &&
-        timer_elapsed(kb30_pressed_at) >= THUMB_HOLD_TERM) {
-        register_code(KC_LCTL);
-        kb_lang_mod_flags |= KB30_HOLD;
-    }
+static void activate_pending_kb_lang_mod_holds(void) {
+    kb_lang_hold(0);
+    kb_lang_hold(1);
+}
 
-    if ((kb_lang_mod_flags & KB31_PRESSED) &&
-        !(kb_lang_mod_flags & KB31_HOLD) &&
-        timer_elapsed(kb31_pressed_at) >= THUMB_HOLD_TERM) {
-        register_code(KC_LSFT);
-        kb_lang_mod_flags |= KB31_HOLD;
+void matrix_scan_user(void) {
+    for (uint8_t i = 0; i < 2; i++) {
+        if ((kb_lang_flags[i] & KB_LANG_PRESSED) &&
+            !(kb_lang_flags[i] & KB_LANG_HOLD) &&
+            timer_elapsed(kb_lang_pressed_at[i]) >= THUMB_HOLD_TERM) {
+            kb_lang_hold(i);
+        }
     }
 }
 
@@ -462,37 +458,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     switch (keycode) {
-        // Remap Kb30: tap=Lang1 / hold=Ctrl
+        // Remap Kb30/Kb31:
+        // Kb30 = tap Lang1 / hold Ctrl
+        // Kb31 = tap Lang2 / hold Shift
         case QK_KB_30:
-            if (record->event.pressed) {
-                kb30_pressed_at = timer_read();
-                kb_lang_mod_flags =
-                    (kb_lang_mod_flags | KB30_PRESSED) & ~KB30_HOLD;
-            } else {
-                if (kb_lang_mod_flags & KB30_HOLD) {
-                    unregister_code(KC_LCTL);
-                } else if (timer_elapsed(kb30_pressed_at) < THUMB_HOLD_TERM) {
-                    tap_code(KC_LNG1);
-                }
-                kb_lang_mod_flags &= ~(KB30_PRESSED | KB30_HOLD);
-            }
-            return false;
+        case QK_KB_31: {
+            uint8_t i = (keycode == QK_KB_31);
 
-        // Remap Kb31: tap=Lang2 / hold=Shift
-        case QK_KB_31:
             if (record->event.pressed) {
-                kb31_pressed_at = timer_read();
-                kb_lang_mod_flags =
-                    (kb_lang_mod_flags | KB31_PRESSED) & ~KB31_HOLD;
+                kb_lang_pressed_at[i] = timer_read();
+                kb_lang_flags[i] = KB_LANG_PRESSED;
             } else {
-                if (kb_lang_mod_flags & KB31_HOLD) {
-                    unregister_code(KC_LSFT);
-                } else if (timer_elapsed(kb31_pressed_at) < THUMB_HOLD_TERM) {
-                    tap_code(KC_LNG2);
+                if (kb_lang_flags[i] & KB_LANG_HOLD) {
+                    unregister_code(i ? KC_LSFT : KC_LCTL);
+                } else if (timer_elapsed(kb_lang_pressed_at[i]) < THUMB_HOLD_TERM) {
+                    tap_code(i ? KC_LNG2 : KC_LNG1);
                 }
-                kb_lang_mod_flags &= ~(KB31_PRESSED | KB31_HOLD);
+
+                kb_lang_flags[i] = 0;
             }
             return false;
+        }
 
         // Remap の Kb 20
         // レイヤー3中だけ、押している間は横スクロールにする
@@ -634,31 +620,20 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             reset_gesture_amount();
 
             // Kb23待機中もカーソル移動やスクロールを発生させない
-            mouse_report.x = 0;
-            mouse_report.y = 0;
-            mouse_report.h = 0;
-            mouse_report.v = 0;
+            clear_mouse_report(&mouse_report);
             return mouse_report;
         }
 
-        // 通常レイヤーでは x/y、スクロールレイヤーでは h/v に変換されるため、両方をジェスチャー量に加算する
         gesture_x += mouse_report.x;
         gesture_y += mouse_report.y;
 
-        // スクロールレイヤー用: h/v は値が小さいため倍率を掛ける
-        // ジェスチャーキー押下中はスクロールスナップを FREE にしているので、
-        // 縦固定スクロール中でも横方向が捨てられず gesture_x に入る。
-        // v は通常の y と上下が逆になるため、符号を反転する。
         gesture_x += mouse_report.h * 48;
         gesture_y -= mouse_report.v * 48;
 
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
-        mouse_report.x = 0;
-        mouse_report.y = 0;
-        mouse_report.h = 0;
-        mouse_report.v = 0;
+        clear_mouse_report(&mouse_report);
 
-        if ((active_gesture_mode == GESTURE_21)) {
+        if (active_gesture_mode == GESTURE_21) {
             // 上: Win+Tab
             // 環境によって上下が逆に感じる場合は、"<" と ">" を入れ替えてください。
             if (gesture_y < -GESTURE_THRESHOLD) {
@@ -685,7 +660,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if ((active_gesture_mode == GESTURE_22)) {
+        if (active_gesture_mode == GESTURE_22) {
             // 上: Alt+Tabの選択画面を開始し、Altを押したまま維持する
             if (gesture_y < -GESTURE_THRESHOLD && !alt_tab_active) {
                 register_code(KC_LALT);
@@ -716,7 +691,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if ((active_gesture_mode == GESTURE_23)) {
+        if (active_gesture_mode == GESTURE_23) {
             // 上: Win+↑ -> Esc
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
@@ -750,7 +725,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if ((active_gesture_mode == GESTURE_26)) {
+        if (active_gesture_mode == GESTURE_26) {
             // 上: 音量アップ
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code(KC_VOLU);
@@ -776,7 +751,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if ((active_gesture_mode == GESTURE_27)) {
+        if (active_gesture_mode == GESTURE_27) {
             // 上: ↑
             if (gesture_y < -GESTURE27_Y_THRESHOLD) {
                 tap_code(KC_UP);
@@ -802,7 +777,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if ((active_gesture_mode == GESTURE_28)) {
+        if (active_gesture_mode == GESTURE_28) {
             // 上: 新規タブ Ctrl+T
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(C(KC_T));
