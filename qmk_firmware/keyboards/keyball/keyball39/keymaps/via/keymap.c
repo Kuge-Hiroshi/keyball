@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "quantum.h"
 
+#define THUMB_HOLD_TERM 100
+
 
 
 // clang-format off
@@ -412,7 +414,98 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
     reset_gesture_amount();
 }
 
+typedef struct {
+    bool pressed;
+    bool hold_active;
+    uint16_t pressed_at;
+    uint16_t tap_keycode;
+    uint8_t hold_keycode;
+} kb_lang_mod_state_t;
+
+static kb_lang_mod_state_t kb30_state = {
+    .tap_keycode = KC_LNG1,
+    .hold_keycode = KC_LCTL,
+};
+
+static kb_lang_mod_state_t kb31_state = {
+    .tap_keycode = KC_LNG2,
+    .hold_keycode = KC_LSFT,
+};
+
+static kb_lang_mod_state_t *get_kb_lang_mod_state(uint16_t keycode) {
+    switch (keycode) {
+        case QK_KB_30:
+            return &kb30_state;
+        case QK_KB_31:
+            return &kb31_state;
+        default:
+            return NULL;
+    }
+}
+
+static bool is_kb_lang_mod(uint16_t keycode) {
+    return keycode == QK_KB_30 || keycode == QK_KB_31;
+}
+
+static void activate_kb_lang_mod_hold(kb_lang_mod_state_t *state) {
+    if (state->pressed && !state->hold_active) {
+        register_code(state->hold_keycode);
+        state->hold_active = true;
+    }
+}
+
+static void activate_pending_kb_lang_mod_holds(void) {
+    activate_kb_lang_mod_hold(&kb30_state);
+    activate_kb_lang_mod_hold(&kb31_state);
+}
+
+static bool process_kb_lang_mod(uint16_t keycode, keyrecord_t *record) {
+    kb_lang_mod_state_t *state = get_kb_lang_mod_state(keycode);
+
+    if (state == NULL) {
+        return true;
+    }
+
+    if (record->event.pressed) {
+        state->pressed = true;
+        state->hold_active = false;
+        state->pressed_at = timer_read();
+    } else {
+        if (state->hold_active) {
+            unregister_code(state->hold_keycode);
+        } else if (timer_elapsed(state->pressed_at) < THUMB_HOLD_TERM) {
+            tap_code16(state->tap_keycode);
+        }
+
+        state->pressed = false;
+        state->hold_active = false;
+    }
+
+    return false;
+}
+
+// 100ms以上押したら、他キー入力がなくてもCtrl/Shiftとして確定する
+void matrix_scan_user(void) {
+    if (kb30_state.pressed && !kb30_state.hold_active &&
+        timer_elapsed(kb30_state.pressed_at) >= THUMB_HOLD_TERM) {
+        activate_kb_lang_mod_hold(&kb30_state);
+    }
+
+    if (kb31_state.pressed && !kb31_state.hold_active &&
+        timer_elapsed(kb31_state.pressed_at) >= THUMB_HOLD_TERM) {
+        activate_kb_lang_mod_hold(&kb31_state);
+    }
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Kb30/Kb31を押しながら別キーを押した瞬間にCtrl/Shiftへ確定する。
+    if (record->event.pressed && !is_kb_lang_mod(keycode)) {
+        activate_pending_kb_lang_mod_holds();
+    }
+
+    if (is_kb_lang_mod(keycode)) {
+        return process_kb_lang_mod(keycode, record);
+    }
     switch (keycode) {
 
         // Remap の Kb 20
@@ -751,14 +844,4 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     }
 
     return mouse_report;
-}
-
-bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    switch (keycode) {
-        case LSFT_T(KC_LNG2):  // tap: Lang2 / hold: Shift
-        case LCTL_T(KC_LNG1):  // tap: Lang1 / hold: Ctrl
-            return true;
-        default:
-            return false;
-    }
 }
