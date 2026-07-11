@@ -400,16 +400,13 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
             gesture23_wait_for_stop = false;
         }
     } else {
-        // Kb22はキーを離してもAlt+Tab画面を維持する。
-        // それ以外のジェスチャーは通常どおり解除する。
+        // Kb22を離した時は、Alt+Tabで現在選択中のアプリを確定する。
         if (mode == GESTURE_22 && alt_tab_active) {
-            active_gesture_mode = GESTURE_NONE;
-            active_gesture_key_valid = false;
-            reset_gesture_amount();
-            gesture_scrollsnap_end();
-        } else {
-            clear_all_gesture_modes();
+            unregister_code(KC_LALT);
+            alt_tab_active = false;
         }
+
+        clear_all_gesture_modes();
     }
 
     reset_gesture_amount();
@@ -504,14 +501,13 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     if (any_gesture_mode &&
         (!active_gesture_key_valid ||
          !matrix_is_on(active_gesture_key.row, active_gesture_key.col))) {
+        // Kb22のリリースイベントを取りこぼした場合も、現在の選択を確定する。
         if (active_gesture_mode == GESTURE_22 && alt_tab_active) {
-            active_gesture_mode = GESTURE_NONE;
-            active_gesture_key_valid = false;
-            reset_gesture_amount();
-            gesture_scrollsnap_end();
-        } else {
-            clear_all_gesture_modes();
+            unregister_code(KC_LALT);
+            alt_tab_active = false;
         }
+
+        clear_all_gesture_modes();
     }
 
     // Kb24/Kb25 の一時変更を毎回監視する。
@@ -631,13 +627,12 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                 reset_gesture_amount();
             }
 
-            // 下: 現在選択中のアプリを確定する
+            // 下: 現在選択中のアプリを確定する。
+            // Kb22自体は押下中のまま維持するため、その後もう一度上へ転がすと
+            // 新しいAlt+Tab選択を開始できる。
             if (gesture_y > GESTURE_THRESHOLD && alt_tab_active) {
                 unregister_code(KC_LALT);
                 alt_tab_active = false;
-                active_gesture_mode = GESTURE_NONE;
-                active_gesture_key_valid = false;
-                gesture_scrollsnap_end();
                 reset_gesture_amount();
             }
         }
