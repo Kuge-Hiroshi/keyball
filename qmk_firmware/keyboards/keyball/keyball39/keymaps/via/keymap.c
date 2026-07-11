@@ -310,12 +310,17 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 #define LAYER6_CPI         4  // 400 CPI
 #define KB25_CPI           2  // Kb25: レイヤー6中に押すと200 CPI
 
-static bool gesture_mode_21 = false;
-static bool gesture_mode_22 = false;
-static bool gesture_mode_23 = false;
-static bool gesture_mode_26 = false;
-static bool gesture_mode_27 = false;
-static bool gesture_mode_28 = false;
+enum gesture_mode_id {
+    GESTURE_NONE = 0,
+    GESTURE_21 = 21,
+    GESTURE_22 = 22,
+    GESTURE_23 = 23,
+    GESTURE_26 = 26,
+    GESTURE_27 = 27,
+    GESTURE_28 = 28,
+};
+
+static uint8_t active_gesture_mode = GESTURE_NONE;
 static bool alt_tab_active  = false;
 // Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
 static bool gesture23_wait_for_stop = false;
@@ -365,13 +370,7 @@ static void gesture_scrollsnap_end(void) {
 // ジェスチャー状態を安全に全解除する。
 // レイヤー0へ戻った時や異常状態の復帰用。
 static void clear_all_gesture_modes(void) {
-    gesture_mode_21 = false;
-    gesture_mode_22 = false;
-    gesture_mode_23 = false;
-    gesture_mode_26 = false;
-    gesture_mode_27 = false;
-    gesture_mode_28 = false;
-
+    active_gesture_mode = GESTURE_NONE;
     gesture23_wait_for_stop = false;
     active_gesture_key_valid = false;
 
@@ -388,16 +387,28 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     // Auto enable scroll mode when the highest layer is 3
     keyball_set_scroll_mode(get_highest_layer(state) == 3);
 
-    // レイヤー0へ戻ったら、取りこぼして残ったジェスチャー状態を解除する
-    if (get_highest_layer(state) == 0) {
-        clear_all_gesture_modes();
-    }
-
     // AML保持用
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     keyball_handle_auto_mouse_layer_change(state);
 #endif
     return state;
+}
+
+static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
+    if (record->event.pressed) {
+        active_gesture_mode = mode;
+        active_gesture_key = record->event.key;
+        active_gesture_key_valid = true;
+        gesture_scrollsnap_begin();
+
+        if (mode == GESTURE_23) {
+            gesture23_wait_for_stop = false;
+        }
+    } else {
+        clear_all_gesture_modes();
+    }
+
+    reset_gesture_amount();
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -420,45 +431,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を Win 系ショートカットに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_21:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_21 = record->event.pressed;
-            if (gesture_mode_21) {
-                gesture_scrollsnap_begin();
-            } else {
-                gesture_scrollsnap_end();
-            }
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_21, record);
             return false;
 
         // Remap の Kb 22
         // トラックボール操作を Alt+Tab 系ショートカットに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_22:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_22 = record->event.pressed;
-            if (gesture_mode_22) {
-                gesture_scrollsnap_begin();
-            } else {
-                gesture_scrollsnap_end();
-            }
-
-            // Kb22 を離したら Alt を離して、選択中のアプリに確定する
-            if (!gesture_mode_22 && alt_tab_active) {
-                unregister_code(KC_LALT);
-                alt_tab_active = false;
-            }
-
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_22, record);
             return false;
 
         // Remap の Kb 23
@@ -466,23 +446,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // 左右スナップ後だけ Snap Assist 候補選択モードに入る
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_23:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_23 = record->event.pressed;
-            if (gesture_mode_23) {
-                gesture_scrollsnap_begin();
-                gesture23_wait_for_stop = false;
-            } else {
-                gesture_scrollsnap_end();
-
-                // Kb23では候補選択を使わないため、離した時は状態だけクリアする
-                            gesture23_wait_for_stop = false;
-            }
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_23, record);
             return false;
 
         // Remap の Kb 24
@@ -509,57 +473,21 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を音量操作に変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_26:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_26 = record->event.pressed;
-            if (gesture_mode_26) {
-                gesture_scrollsnap_begin();
-            } else {
-                gesture_scrollsnap_end();
-            }
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_26, record);
             return false;
 
         // Remap の Kb 27
         // トラックボール操作を矢印キーに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_27:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_27 = record->event.pressed;
-            if (gesture_mode_27) {
-                gesture_scrollsnap_begin();
-            } else {
-                gesture_scrollsnap_end();
-            }
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_27, record);
             return false;
 
         // Remap の Kb 28
         // トラックボール操作をブラウザのタブ操作に変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_28:
-            if (record->event.pressed) {
-                active_gesture_key = record->event.key;
-                active_gesture_key_valid = true;
-            } else {
-                active_gesture_key_valid = false;
-            }
-            gesture_mode_28 = record->event.pressed;
-            if (gesture_mode_28) {
-                gesture_scrollsnap_begin();
-            } else {
-                gesture_scrollsnap_end();
-            }
-            reset_gesture_amount();
+            set_gesture_mode(GESTURE_28, record);
             return false;
     }
 
@@ -567,9 +495,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    const bool any_gesture_mode =
-        gesture_mode_21 || gesture_mode_22 || gesture_mode_23 ||
-        gesture_mode_26 || gesture_mode_27 || gesture_mode_28;
+    const bool any_gesture_mode = active_gesture_mode != GESTURE_NONE;
 
     if (any_gesture_mode &&
         (!active_gesture_key_valid ||
@@ -610,12 +536,12 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         set_cpi_once(layer_state_is(6) ? LAYER6_CPI : DEFAULT_CPI);
     }
 
-    if (gesture_mode_21 || gesture_mode_22 || gesture_mode_23 || gesture_mode_26 || gesture_mode_27 || gesture_mode_28) {
+    if (active_gesture_mode != GESTURE_NONE) {
         // Kb23用: 発火後は、ボールが止まるまで移動量を無視する
         // h/v はスクロールレイヤーで使われるため、x/y と合わせて停止判定する
-        bool gesture23_ball_stopped = (abs(mouse_report.x) <= 1 && abs(mouse_report.y) <= 1 && abs(mouse_report.h) <= 1 && abs(mouse_report.v) <= 1);
+        bool gesture23_ball_stopped = ((mouse_report.x | mouse_report.y | mouse_report.h | mouse_report.v) == 0);
 
-        if (gesture_mode_23 && gesture23_wait_for_stop) {
+        if ((active_gesture_mode == GESTURE_23) && gesture23_wait_for_stop) {
             if (gesture23_ball_stopped) {
                 gesture23_wait_for_stop = false;
             }
@@ -646,7 +572,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_report.h = 0;
         mouse_report.v = 0;
 
-        if (gesture_mode_21) {
+        if ((active_gesture_mode == GESTURE_21)) {
             // 上: Win+Tab
             // 環境によって上下が逆に感じる場合は、"<" と ">" を入れ替えてください。
             if (gesture_y < -GESTURE_THRESHOLD) {
@@ -673,7 +599,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if (gesture_mode_22) {
+        if ((active_gesture_mode == GESTURE_22)) {
             // 上: Alt+Tab 画面を開く
             if (gesture_y < -GESTURE_THRESHOLD && !alt_tab_active) {
                 register_code(KC_LALT);
@@ -714,7 +640,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if (gesture_mode_23) {
+        if ((active_gesture_mode == GESTURE_23)) {
             // 上: Win+↑ -> Esc
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
@@ -748,7 +674,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if (gesture_mode_26) {
+        if ((active_gesture_mode == GESTURE_26)) {
             // 上: 音量アップ
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code(KC_VOLU);
@@ -774,7 +700,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if (gesture_mode_27) {
+        if ((active_gesture_mode == GESTURE_27)) {
             // 上: ↑
             if (gesture_y < -GESTURE27_Y_THRESHOLD) {
                 tap_code(KC_UP);
@@ -800,7 +726,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             }
         }
 
-        if (gesture_mode_28) {
+        if ((active_gesture_mode == GESTURE_28)) {
             // 上: 新規タブ Ctrl+T
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(C(KC_T));
