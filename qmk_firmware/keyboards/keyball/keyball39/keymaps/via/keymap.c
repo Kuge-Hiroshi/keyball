@@ -1,8 +1,3 @@
-ライブラリ
-/
-keymap_kb30_kb31_lang_mod_compact.c
-
-
 /*
 Copyright 2022 @Yowkees
 Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
