@@ -317,9 +317,13 @@ static bool gesture_mode_26 = false;
 static bool gesture_mode_27 = false;
 static bool gesture_mode_28 = false;
 static bool alt_tab_active  = false;
-static bool snap_assist_mode = false;
 // Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
 static bool gesture23_wait_for_stop = false;
+
+// 現在押されているジェスチャーキーの物理位置。
+// リリースイベントを取りこぼしても matrix_is_on() で実状態を確認する。
+static keypos_t active_gesture_key;
+static bool active_gesture_key_valid = false;
 static bool kb24_scroll_div_active = false;
 static bool kb25_cpi_active = false;
 static bool kb24_seen_layer3 = false;
@@ -369,7 +373,7 @@ static void clear_all_gesture_modes(void) {
     gesture_mode_28 = false;
 
     gesture23_wait_for_stop = false;
-    snap_assist_mode = false;
+    active_gesture_key_valid = false;
 
     if (alt_tab_active) {
         unregister_code(KC_LALT);
@@ -416,6 +420,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を Win 系ショートカットに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_21:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_21 = record->event.pressed;
             if (gesture_mode_21) {
                 gesture_scrollsnap_begin();
@@ -429,6 +439,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を Alt+Tab 系ショートカットに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_22:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_22 = record->event.pressed;
             if (gesture_mode_22) {
                 gesture_scrollsnap_begin();
@@ -450,6 +466,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // 左右スナップ後だけ Snap Assist 候補選択モードに入る
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_23:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_23 = record->event.pressed;
             if (gesture_mode_23) {
                 gesture_scrollsnap_begin();
@@ -458,8 +480,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 gesture_scrollsnap_end();
 
                 // Kb23では候補選択を使わないため、離した時は状態だけクリアする
-                snap_assist_mode = false;
-                gesture23_wait_for_stop = false;
+                            gesture23_wait_for_stop = false;
             }
             reset_gesture_amount();
             return false;
@@ -488,6 +509,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を音量操作に変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_26:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_26 = record->event.pressed;
             if (gesture_mode_26) {
                 gesture_scrollsnap_begin();
@@ -501,6 +528,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作を矢印キーに変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_27:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_27 = record->event.pressed;
             if (gesture_mode_27) {
                 gesture_scrollsnap_begin();
@@ -514,6 +547,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // トラックボール操作をブラウザのタブ操作に変換する
         // レイヤー3のスクロールレイヤー中でも使用可能
         case QK_KB_28:
+            if (record->event.pressed) {
+                active_gesture_key = record->event.key;
+                active_gesture_key_valid = true;
+            } else {
+                active_gesture_key_valid = false;
+            }
             gesture_mode_28 = record->event.pressed;
             if (gesture_mode_28) {
                 gesture_scrollsnap_begin();
@@ -528,6 +567,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    const bool any_gesture_mode =
+        gesture_mode_21 || gesture_mode_22 || gesture_mode_23 ||
+        gesture_mode_26 || gesture_mode_27 || gesture_mode_28;
+
+    if (any_gesture_mode &&
+        (!active_gesture_key_valid ||
+         !matrix_is_on(active_gesture_key.row, active_gesture_key.col))) {
+        clear_all_gesture_modes();
+    }
+
     // Kb24/Kb25 の一時変更を毎回監視する。
     // Kb24はレイヤー3中、DIV 9を再適用することでスクロール側の上書きを避ける。
     if (kb24_scroll_div_active) {
@@ -670,8 +719,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
                 tap_code(KC_ESC);
-                snap_assist_mode = false;
-                gesture23_wait_for_stop = true;
+                            gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -679,8 +727,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_y > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_DOWN));
                 tap_code(KC_ESC);
-                snap_assist_mode = false;
-                gesture23_wait_for_stop = true;
+                            gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -688,8 +735,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_x > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_RGHT));
                 tap_code(KC_ESC);
-                snap_assist_mode = false;
-                gesture23_wait_for_stop = true;
+                            gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
 
@@ -697,8 +743,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_x < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_LEFT));
                 tap_code(KC_ESC);
-                snap_assist_mode = false;
-                gesture23_wait_for_stop = true;
+                            gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
         }
