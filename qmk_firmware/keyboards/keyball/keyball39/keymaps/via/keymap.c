@@ -374,11 +374,6 @@ static void clear_all_gesture_modes(void) {
     gesture23_wait_for_stop = false;
     active_gesture_key_valid = false;
 
-    if (alt_tab_active) {
-        unregister_code(KC_LALT);
-        alt_tab_active = false;
-    }
-
     reset_gesture_amount();
     gesture_scrollsnap_end();
 }
@@ -405,7 +400,16 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
             gesture23_wait_for_stop = false;
         }
     } else {
-        clear_all_gesture_modes();
+        // Kb22はキーを離してもAlt+Tab画面を維持する。
+        // それ以外のジェスチャーは通常どおり解除する。
+        if (mode == GESTURE_22 && alt_tab_active) {
+            active_gesture_mode = GESTURE_NONE;
+            active_gesture_key_valid = false;
+            reset_gesture_amount();
+            gesture_scrollsnap_end();
+        } else {
+            clear_all_gesture_modes();
+        }
     }
 
     reset_gesture_amount();
@@ -500,7 +504,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     if (any_gesture_mode &&
         (!active_gesture_key_valid ||
          !matrix_is_on(active_gesture_key.row, active_gesture_key.col))) {
-        clear_all_gesture_modes();
+        if (active_gesture_mode == GESTURE_22 && alt_tab_active) {
+            active_gesture_mode = GESTURE_NONE;
+            active_gesture_key_valid = false;
+            reset_gesture_amount();
+            gesture_scrollsnap_end();
+        } else {
+            clear_all_gesture_modes();
+        }
     }
 
     // Kb24/Kb25 の一時変更を毎回監視する。
@@ -600,30 +611,11 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         }
 
         if ((active_gesture_mode == GESTURE_22)) {
-            // 上: Alt+Tab 画面を開く
+            // 上: Alt+Tabの選択画面を開始し、Altを押したまま維持する
             if (gesture_y < -GESTURE_THRESHOLD && !alt_tab_active) {
                 register_code(KC_LALT);
                 tap_code(KC_TAB);
                 alt_tab_active = true;
-                reset_gesture_amount();
-            }
-
-            // 下: Alt+Tab中の選択アプリを閉じる
-            if (gesture_y > GESTURE_THRESHOLD) {
-                if (alt_tab_active) {
-                    // Alt+Tab画面上ではAlt+F4が効かず選択だけになることがあるため、
-                    // いったんAltを離して選択中ウィンドウをアクティブ化し、
-                    // ブロッキング待機を入れずにAlt+F4を送る。
-                    unregister_code(KC_LALT);
-                    alt_tab_active = false;
-                    register_code(KC_LALT);
-                    tap_code(KC_F4);
-                    unregister_code(KC_LALT);
-                } else {
-                    register_code(KC_LALT);   // 通常時も確実にAlt+F4を送る
-                    tap_code(KC_F4);
-                    unregister_code(KC_LALT);
-                }
                 reset_gesture_amount();
             }
 
@@ -636,6 +628,16 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 左: 前のアプリへ
             if (gesture_x < -GESTURE_THRESHOLD && alt_tab_active) {
                 tap_code16(S(KC_TAB));
+                reset_gesture_amount();
+            }
+
+            // 下: 現在選択中のアプリを確定する
+            if (gesture_y > GESTURE_THRESHOLD && alt_tab_active) {
+                unregister_code(KC_LALT);
+                alt_tab_active = false;
+                active_gesture_mode = GESTURE_NONE;
+                active_gesture_key_valid = false;
+                gesture_scrollsnap_end();
                 reset_gesture_amount();
             }
         }
