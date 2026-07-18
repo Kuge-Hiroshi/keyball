@@ -679,6 +679,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                         case GESTURE_DIR_DOWN:  tap_code16(G(KC_D)); break;
                         case GESTURE_DIR_RIGHT: tap_code16(C(G(KC_RGHT))); break;
                         case GESTURE_DIR_LEFT:  tap_code16(C(G(KC_LEFT))); break;
+                        default: break;
                     }
                     break;
 
@@ -707,6 +708,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                         case GESTURE_DIR_DOWN:  keycode = G(KC_DOWN); break;
                         case GESTURE_DIR_RIGHT: keycode = G(KC_RGHT); break;
                         case GESTURE_DIR_LEFT:  keycode = G(KC_LEFT); break;
+                        default: break;
                     }
 
                     if (keycode != KC_NO) {
@@ -735,6 +737,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                         case GESTURE_DIR_DOWN:  tap_code(KC_DOWN); break;
                         case GESTURE_DIR_RIGHT: tap_code(KC_RGHT); break;
                         case GESTURE_DIR_LEFT:  tap_code(KC_LEFT); break;
+                        default: break;
                     }
                     break;
 
@@ -744,6 +747,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
                         case GESTURE_DIR_DOWN:  tap_code16(C(KC_W)); break;
                         case GESTURE_DIR_RIGHT: tap_code16(C(KC_TAB)); break;
                         case GESTURE_DIR_LEFT:  tap_code16(C(S(KC_TAB))); break;
+                        default: break;
                     }
                     break;
             }
