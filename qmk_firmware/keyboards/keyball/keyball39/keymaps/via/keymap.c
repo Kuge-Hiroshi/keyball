@@ -288,17 +288,11 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
 #define GESTURE_THRESHOLD 250
 
-// Kb23: Win+矢印の直後に送るESCを短時間保持し、
-// Windows側での取りこぼしを減らす。
-// Deferred Executorは使わないため、ファームウェア容量の増加を抑えられる。
-#define KB23_ESC_HOLD_US 500
-#define KB23_STOP_CONFIRM_COUNT 5
-
-static void send_kb23_esc(void) {
-    register_code(KC_ESC);
-    wait_us(KB23_ESC_HOLD_US);
-    unregister_code(KC_ESC);
-}
+// Kb23:
+    // Win+矢印の送信後、WindowsのSnap Assistが表示されるまで待ってからESCを送る。
+    // ボール停止判定は、最後の移動検出から一定時間無入力になった時点で解除する。
+#define KB23_ESC_DELAY_MS 35
+#define KB23_STOP_TIME_MS 100
 
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
@@ -309,8 +303,8 @@ static void send_kb23_esc(void) {
 #define DEFAULT_SCROLL_DIV 7
 #define KB24_SCROLL_DIV    5  // Kb24: DIVを5にする
 #define DEFAULT_CPI        6  // 600 CPI
-#define LAYER6_CPI         4  // 400 CPI
-#define KB25_CPI           2  // Kb25: レイヤー6中に押すと200 CPI
+#define LAYER4_CPI         4  // 400 CPI
+#define KB25_CPI           2  // Kb25: レイヤー4中に押すと200 CPI
 
 enum gesture_mode_id {
     GESTURE_NONE = 0,
@@ -324,9 +318,11 @@ enum gesture_mode_id {
 
 static uint8_t active_gesture_mode = GESTURE_NONE;
 static bool alt_tab_active  = false;
-// Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
+// Kb23: 発火後、ボール停止まで再発火を抑止する。
 static bool gesture23_wait_for_stop = false;
-static uint8_t gesture23_stop_count = 0;
+static bool kb23_esc_pending = false;
+static uint16_t kb23_esc_started_at = 0;
+static uint16_t kb23_last_motion_at = 0;
 
 // 現在押されているジェスチャーキーの物理位置。
 // リリースイベントを取りこぼしても matrix_is_on() で実状態を確認する。
@@ -335,7 +331,7 @@ static bool active_gesture_key_valid = false;
 static bool kb24_scroll_div_active = false;
 static bool kb25_cpi_active = false;
 static bool kb24_seen_layer3 = false;
-static bool kb25_seen_layer6 = false;
+static bool kb25_seen_layer4 = false;
 static int16_t gesture_x    = 0;
 static int16_t gesture_y    = 0;
 static uint8_t current_scroll_div = DEFAULT_SCROLL_DIV;
@@ -382,7 +378,7 @@ static void gesture_scrollsnap_end(void) {
 static void clear_all_gesture_modes(void) {
     active_gesture_mode = GESTURE_NONE;
     gesture23_wait_for_stop = false;
-    gesture23_stop_count = 0;
+    kb23_esc_pending = false;
     active_gesture_key_valid = false;
 
     reset_gesture_amount();
@@ -409,7 +405,8 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
 
         if (mode == GESTURE_23) {
             gesture23_wait_for_stop = false;
-            gesture23_stop_count = 0;
+            kb23_esc_pending = false;
+            kb23_last_motion_at = timer_read();
         }
     } else {
         // Kb22を離した時は、Alt+Tabで現在選択中のアプリを確定する。
@@ -450,6 +447,14 @@ void matrix_scan_user(void) {
             timer_elapsed(kb_lang_pressed_at[i]) >= THUMB_HOLD_TERM) {
             kb_lang_hold(i);
         }
+    }
+
+    // Kb23: Win+矢印から少し遅らせてESCを送る。
+    // pointing_device_task_user()を待機で止めないため、通常タイマーで処理する。
+    if (kb23_esc_pending &&
+        timer_elapsed(kb23_esc_started_at) >= KB23_ESC_DELAY_MS) {
+        tap_code(KC_ESC);
+        kb23_esc_pending = false;
     }
 }
 
@@ -529,11 +534,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
 
         // Remap の Kb 25
-        // 押下してからレイヤー6を一度離れるまで、CPIを200下げる
+        // 押下してからレイヤー4を一度離れるまで、CPIを200下げる
         case QK_KB_25:
             if (record->event.pressed) {
                 kb25_cpi_active = true;
-                kb25_seen_layer6 = layer_state_is(6);
+                kb25_seen_layer4 = layer_state_is(4);
                 set_cpi_once(KB25_CPI);
             }
             return false;
@@ -593,47 +598,41 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 
     // CPI制御
     // 通常: 700
-    // レイヤー6: 500
-    // レイヤー6中にKb25押下後: レイヤー6を抜けるまで300
+    // レイヤー4: 400
+    // レイヤー4中にKb25押下後: レイヤー4を抜けるまで200
     if (kb25_cpi_active) {
-        if (layer_state_is(6)) {
-            kb25_seen_layer6 = true;
+        if (layer_state_is(4)) {
+            kb25_seen_layer4 = true;
             set_cpi_once(KB25_CPI);
-        } else if (kb25_seen_layer6) {
+        } else if (kb25_seen_layer4) {
             kb25_cpi_active = false;
-            kb25_seen_layer6 = false;
+            kb25_seen_layer4 = false;
             set_cpi_once(DEFAULT_CPI);
         } else {
             kb25_cpi_active = false;
-            set_cpi_once(layer_state_is(6) ? LAYER6_CPI : DEFAULT_CPI);
+            set_cpi_once(layer_state_is(4) ? LAYER4_CPI : DEFAULT_CPI);
         }
     } else {
-        set_cpi_once(layer_state_is(6) ? LAYER6_CPI : DEFAULT_CPI);
+        set_cpi_once(layer_state_is(4) ? LAYER4_CPI : DEFAULT_CPI);
     }
 
     if (active_gesture_mode != GESTURE_NONE) {
-        // Kb23用: 発火後は、ボールが止まるまで移動量を無視する
-        // h/v はスクロールレイヤーで使われるため、x/y と合わせて停止判定する
-        bool gesture23_ball_stopped = ((mouse_report.x | mouse_report.y | mouse_report.h | mouse_report.v) == 0);
-
+        // Kb23用: 発火後は、最後の移動検出から一定時間が経過するまで
+        // すべてのボール入力を破棄する。一瞬だけ0入力になっても解除しない。
         if ((active_gesture_mode == GESTURE_23) && gesture23_wait_for_stop) {
-            if (gesture23_ball_stopped) {
-                if (gesture23_stop_count < KB23_STOP_CONFIRM_COUNT) {
-                    gesture23_stop_count++;
-                }
+            const bool kb23_ball_is_moving =
+                mouse_report.x != 0 ||
+                mouse_report.y != 0 ||
+                mouse_report.h != 0 ||
+                mouse_report.v != 0;
 
-                if (gesture23_stop_count >= KB23_STOP_CONFIRM_COUNT) {
-                    gesture23_wait_for_stop = false;
-                    gesture23_stop_count = 0;
-                }
-            } else {
-                // 回転入力が続いている間は停止確認をやり直す
-                gesture23_stop_count = 0;
+            if (kb23_ball_is_moving) {
+                kb23_last_motion_at = timer_read();
+            } else if (timer_elapsed(kb23_last_motion_at) >= KB23_STOP_TIME_MS) {
+                gesture23_wait_for_stop = false;
             }
 
             reset_gesture_amount();
-
-            // Kb23待機中もカーソル移動やスクロールを発生させない
             clear_mouse_report(&mouse_report);
             return mouse_report;
         }
@@ -709,36 +708,40 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 上: Win+↑ -> Esc
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
-                send_kb23_esc();
+                kb23_esc_pending = true;
+                kb23_esc_started_at = timer_read();
                 gesture23_wait_for_stop = true;
-                gesture23_stop_count = 0;
+                kb23_last_motion_at = timer_read();
                 reset_gesture_amount();
             }
 
             // 下: Win+↓ -> Esc
             if (gesture_y > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_DOWN));
-                send_kb23_esc();
+                kb23_esc_pending = true;
+                kb23_esc_started_at = timer_read();
                 gesture23_wait_for_stop = true;
-                gesture23_stop_count = 0;
+                kb23_last_motion_at = timer_read();
                 reset_gesture_amount();
             }
 
             // 右: アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をキャンセル
             if (gesture_x > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_RGHT));
-                send_kb23_esc();
+                kb23_esc_pending = true;
+                kb23_esc_started_at = timer_read();
                 gesture23_wait_for_stop = true;
-                gesture23_stop_count = 0;
+                kb23_last_motion_at = timer_read();
                 reset_gesture_amount();
             }
 
             // 左: アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をキャンセル
             if (gesture_x < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_LEFT));
-                send_kb23_esc();
+                kb23_esc_pending = true;
+                kb23_esc_started_at = timer_read();
                 gesture23_wait_for_stop = true;
-                gesture23_stop_count = 0;
+                kb23_last_motion_at = timer_read();
                 reset_gesture_amount();
             }
         }
