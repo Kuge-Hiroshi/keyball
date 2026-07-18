@@ -292,6 +292,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // Windows側での取りこぼしを減らす。
 // Deferred Executorは使わないため、ファームウェア容量の増加を抑えられる。
 #define KB23_ESC_HOLD_US 500
+#define KB23_STOP_CONFIRM_COUNT 5
 
 static void send_kb23_esc(void) {
     register_code(KC_ESC);
@@ -325,6 +326,7 @@ static uint8_t active_gesture_mode = GESTURE_NONE;
 static bool alt_tab_active  = false;
 // Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
 static bool gesture23_wait_for_stop = false;
+static uint8_t gesture23_stop_count = 0;
 
 // 現在押されているジェスチャーキーの物理位置。
 // リリースイベントを取りこぼしても matrix_is_on() で実状態を確認する。
@@ -380,6 +382,7 @@ static void gesture_scrollsnap_end(void) {
 static void clear_all_gesture_modes(void) {
     active_gesture_mode = GESTURE_NONE;
     gesture23_wait_for_stop = false;
+    gesture23_stop_count = 0;
     active_gesture_key_valid = false;
 
     reset_gesture_amount();
@@ -406,6 +409,7 @@ static void set_gesture_mode(uint8_t mode, keyrecord_t *record) {
 
         if (mode == GESTURE_23) {
             gesture23_wait_for_stop = false;
+            gesture23_stop_count = 0;
         }
     } else {
         // Kb22を離した時は、Alt+Tabで現在選択中のアプリを確定する。
@@ -614,8 +618,19 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 
         if ((active_gesture_mode == GESTURE_23) && gesture23_wait_for_stop) {
             if (gesture23_ball_stopped) {
-                gesture23_wait_for_stop = false;
+                if (gesture23_stop_count < KB23_STOP_CONFIRM_COUNT) {
+                    gesture23_stop_count++;
+                }
+
+                if (gesture23_stop_count >= KB23_STOP_CONFIRM_COUNT) {
+                    gesture23_wait_for_stop = false;
+                    gesture23_stop_count = 0;
+                }
+            } else {
+                // 回転入力が続いている間は停止確認をやり直す
+                gesture23_stop_count = 0;
             }
+
             reset_gesture_amount();
 
             // Kb23待機中もカーソル移動やスクロールを発生させない
@@ -695,7 +710,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
                 send_kb23_esc();
-                            gesture23_wait_for_stop = true;
+                gesture23_wait_for_stop = true;
+                gesture23_stop_count = 0;
                 reset_gesture_amount();
             }
 
@@ -703,7 +719,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_y > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_DOWN));
                 send_kb23_esc();
-                            gesture23_wait_for_stop = true;
+                gesture23_wait_for_stop = true;
+                gesture23_stop_count = 0;
                 reset_gesture_amount();
             }
 
@@ -711,7 +728,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_x > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_RGHT));
                 send_kb23_esc();
-                            gesture23_wait_for_stop = true;
+                gesture23_wait_for_stop = true;
+                gesture23_stop_count = 0;
                 reset_gesture_amount();
             }
 
@@ -719,7 +737,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             if (gesture_x < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_LEFT));
                 send_kb23_esc();
-                            gesture23_wait_for_stop = true;
+                gesture23_wait_for_stop = true;
+                gesture23_stop_count = 0;
                 reset_gesture_amount();
             }
         }
