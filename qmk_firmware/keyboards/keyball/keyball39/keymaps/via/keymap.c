@@ -291,7 +291,7 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // Kb23:
     // Win+矢印の送信後、WindowsのSnap Assistが表示されるまで待ってからESCを送る。
     // ボール停止判定は、最後の移動検出から一定時間無入力になった時点で解除する。
-#define KB23_ESC_DELAY_MS 35
+#define KB23_ESC_DELAY_MS 60
 #define KB23_STOP_TIME_MS 100
 
 // Kb27専用の矢印キー用しきい値
@@ -453,7 +453,7 @@ void matrix_scan_user(void) {
     // pointing_device_task_user()を待機で止めないため、通常タイマーで処理する。
     if (kb23_esc_pending &&
         timer_elapsed(kb23_esc_started_at) >= KB23_ESC_DELAY_MS) {
-        tap_code(KC_ESC);
+        tap_code_delay(KC_ESC, 20);
         kb23_esc_pending = false;
     }
 }
