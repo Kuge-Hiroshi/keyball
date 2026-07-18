@@ -646,182 +646,109 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         // Kb21/Kb22/Kb23 押下中はカーソル移動やスクロールを発生させない
         clear_mouse_report(&mouse_report);
 
-        if (active_gesture_mode == GESTURE_21) {
-            // 上: Win+Tab
-            // 環境によって上下が逆に感じる場合は、"<" と ">" を入れ替えてください。
-            if (gesture_y < -GESTURE_THRESHOLD) {
-                tap_code16(G(KC_TAB));
-                reset_gesture_amount();
-            }
+        // 方向判定を1回に共通化し、各ジェスチャーの重複コードを削減する。
+        // 斜め入力時の優先順位は従来と同じく、上 → 下 → 右 → 左。
+        enum {
+            GESTURE_DIR_NONE,
+            GESTURE_DIR_UP,
+            GESTURE_DIR_DOWN,
+            GESTURE_DIR_RIGHT,
+            GESTURE_DIR_LEFT,
+        } gesture_dir = GESTURE_DIR_NONE;
 
-            // 下: デスクトップ表示
-            if (gesture_y > GESTURE_THRESHOLD) {
-                tap_code16(G(KC_D));
-                reset_gesture_amount();
-            }
+        const int16_t x_threshold =
+            active_gesture_mode == GESTURE_27 ? GESTURE27_X_THRESHOLD : GESTURE_THRESHOLD;
+        const int16_t y_threshold =
+            active_gesture_mode == GESTURE_27 ? GESTURE27_Y_THRESHOLD : GESTURE_THRESHOLD;
 
-            // 右: 仮想デスクトップ右
-            if (gesture_x > GESTURE_THRESHOLD) {
-                tap_code16(C(G(KC_RGHT)));
-                reset_gesture_amount();
-            }
-
-            // 左: 仮想デスクトップ左
-            if (gesture_x < -GESTURE_THRESHOLD) {
-                tap_code16(C(G(KC_LEFT)));
-                reset_gesture_amount();
-            }
+        if (gesture_y < -y_threshold) {
+            gesture_dir = GESTURE_DIR_UP;
+        } else if (gesture_y > y_threshold) {
+            gesture_dir = GESTURE_DIR_DOWN;
+        } else if (gesture_x > x_threshold) {
+            gesture_dir = GESTURE_DIR_RIGHT;
+        } else if (gesture_x < -x_threshold) {
+            gesture_dir = GESTURE_DIR_LEFT;
         }
 
-        if (active_gesture_mode == GESTURE_22) {
-            // 上: Alt+Tabの選択画面を開始し、Altを押したまま維持する
-            if (gesture_y < -GESTURE_THRESHOLD && !alt_tab_active) {
-                register_code(KC_LALT);
-                tap_code(KC_TAB);
-                alt_tab_active = true;
-                reset_gesture_amount();
+        if (gesture_dir != GESTURE_DIR_NONE) {
+            switch (active_gesture_mode) {
+                case GESTURE_21:
+                    switch (gesture_dir) {
+                        case GESTURE_DIR_UP:    tap_code16(G(KC_TAB)); break;
+                        case GESTURE_DIR_DOWN:  tap_code16(G(KC_D)); break;
+                        case GESTURE_DIR_RIGHT: tap_code16(C(G(KC_RGHT))); break;
+                        case GESTURE_DIR_LEFT:  tap_code16(C(G(KC_LEFT))); break;
+                    }
+                    break;
+
+                case GESTURE_22:
+                    if (gesture_dir == GESTURE_DIR_UP && !alt_tab_active) {
+                        register_code(KC_LALT);
+                        tap_code(KC_TAB);
+                        alt_tab_active = true;
+                    } else if (alt_tab_active) {
+                        if (gesture_dir == GESTURE_DIR_RIGHT) {
+                            tap_code(KC_TAB);
+                        } else if (gesture_dir == GESTURE_DIR_LEFT) {
+                            tap_code16(S(KC_TAB));
+                        } else if (gesture_dir == GESTURE_DIR_DOWN) {
+                            unregister_code(KC_LALT);
+                            alt_tab_active = false;
+                        }
+                    }
+                    break;
+
+                case GESTURE_23: {
+                    uint16_t keycode = KC_NO;
+
+                    switch (gesture_dir) {
+                        case GESTURE_DIR_UP:    keycode = G(KC_UP); break;
+                        case GESTURE_DIR_DOWN:  keycode = G(KC_DOWN); break;
+                        case GESTURE_DIR_RIGHT: keycode = G(KC_RGHT); break;
+                        case GESTURE_DIR_LEFT:  keycode = G(KC_LEFT); break;
+                    }
+
+                    if (keycode != KC_NO) {
+                        tap_code16(keycode);
+                        kb23_esc_pending = true;
+                        kb23_esc_started_at = timer_read();
+                        gesture23_wait_for_stop = true;
+                        kb23_last_motion_at = kb23_esc_started_at;
+                    }
+                    break;
+                }
+
+                case GESTURE_26:
+                    if (gesture_dir == GESTURE_DIR_UP) {
+                        tap_code(KC_VOLU);
+                    } else if (gesture_dir == GESTURE_DIR_DOWN) {
+                        tap_code(KC_VOLD);
+                    } else {
+                        tap_code(KC_MUTE);
+                    }
+                    break;
+
+                case GESTURE_27:
+                    switch (gesture_dir) {
+                        case GESTURE_DIR_UP:    tap_code(KC_UP); break;
+                        case GESTURE_DIR_DOWN:  tap_code(KC_DOWN); break;
+                        case GESTURE_DIR_RIGHT: tap_code(KC_RGHT); break;
+                        case GESTURE_DIR_LEFT:  tap_code(KC_LEFT); break;
+                    }
+                    break;
+
+                case GESTURE_28:
+                    switch (gesture_dir) {
+                        case GESTURE_DIR_UP:    tap_code16(C(KC_T)); break;
+                        case GESTURE_DIR_DOWN:  tap_code16(C(KC_W)); break;
+                        case GESTURE_DIR_RIGHT: tap_code16(C(KC_TAB)); break;
+                        case GESTURE_DIR_LEFT:  tap_code16(C(S(KC_TAB))); break;
+                    }
+                    break;
             }
 
-            // 右: 次のアプリへ
-            if (gesture_x > GESTURE_THRESHOLD && alt_tab_active) {
-                tap_code(KC_TAB);
-                reset_gesture_amount();
-            }
-
-            // 左: 前のアプリへ
-            if (gesture_x < -GESTURE_THRESHOLD && alt_tab_active) {
-                tap_code16(S(KC_TAB));
-                reset_gesture_amount();
-            }
-
-            // 下: 現在選択中のアプリを確定する。
-            // Kb22自体は押下中のまま維持するため、その後もう一度上へ転がすと
-            // 新しいAlt+Tab選択を開始できる。
-            if (gesture_y > GESTURE_THRESHOLD && alt_tab_active) {
-                unregister_code(KC_LALT);
-                alt_tab_active = false;
-                reset_gesture_amount();
-            }
-        }
-
-        if (active_gesture_mode == GESTURE_23) {
-            // 上: Win+↑ -> Esc
-            if (gesture_y < -GESTURE_THRESHOLD) {
-                tap_code16(G(KC_UP));
-                kb23_esc_pending = true;
-                kb23_esc_started_at = timer_read();
-                gesture23_wait_for_stop = true;
-                kb23_last_motion_at = timer_read();
-                reset_gesture_amount();
-            }
-
-            // 下: Win+↓ -> Esc
-            if (gesture_y > GESTURE_THRESHOLD) {
-                tap_code16(G(KC_DOWN));
-                kb23_esc_pending = true;
-                kb23_esc_started_at = timer_read();
-                gesture23_wait_for_stop = true;
-                kb23_last_motion_at = timer_read();
-                reset_gesture_amount();
-            }
-
-            // 右: アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をキャンセル
-            if (gesture_x > GESTURE_THRESHOLD) {
-                tap_code16(G(KC_RGHT));
-                kb23_esc_pending = true;
-                kb23_esc_started_at = timer_read();
-                gesture23_wait_for_stop = true;
-                kb23_last_motion_at = timer_read();
-                reset_gesture_amount();
-            }
-
-            // 左: アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をキャンセル
-            if (gesture_x < -GESTURE_THRESHOLD) {
-                tap_code16(G(KC_LEFT));
-                kb23_esc_pending = true;
-                kb23_esc_started_at = timer_read();
-                gesture23_wait_for_stop = true;
-                kb23_last_motion_at = timer_read();
-                reset_gesture_amount();
-            }
-        }
-
-        if (active_gesture_mode == GESTURE_26) {
-            // 上: 音量アップ
-            if (gesture_y < -GESTURE_THRESHOLD) {
-                tap_code(KC_VOLU);
-                reset_gesture_amount();
-            }
-
-            // 下: 音量ダウン
-            if (gesture_y > GESTURE_THRESHOLD) {
-                tap_code(KC_VOLD);
-                reset_gesture_amount();
-            }
-
-            // 右: ミュート切替
-            if (gesture_x > GESTURE_THRESHOLD) {
-                tap_code(KC_MUTE);
-                reset_gesture_amount();
-            }
-
-            // 左: ミュート切替
-            if (gesture_x < -GESTURE_THRESHOLD) {
-                tap_code(KC_MUTE);
-                reset_gesture_amount();
-            }
-        }
-
-        if (active_gesture_mode == GESTURE_27) {
-            // 上: ↑
-            if (gesture_y < -GESTURE27_Y_THRESHOLD) {
-                tap_code(KC_UP);
-                reset_gesture_amount();
-            }
-
-            // 下: ↓
-            if (gesture_y > GESTURE27_Y_THRESHOLD) {
-                tap_code(KC_DOWN);
-                reset_gesture_amount();
-            }
-
-            // 右: →
-            if (gesture_x > GESTURE27_X_THRESHOLD) {
-                tap_code(KC_RGHT);
-                reset_gesture_amount();
-            }
-
-            // 左: ←
-            if (gesture_x < -GESTURE27_X_THRESHOLD) {
-                tap_code(KC_LEFT);
-                reset_gesture_amount();
-            }
-        }
-
-        if (active_gesture_mode == GESTURE_28) {
-            // 上: 新規タブ Ctrl+T
-            if (gesture_y < -GESTURE_THRESHOLD) {
-                tap_code16(C(KC_T));
-                reset_gesture_amount();
-            }
-
-            // 下: 現在のタブを閉じる Ctrl+W
-            if (gesture_y > GESTURE_THRESHOLD) {
-                tap_code16(C(KC_W));
-                reset_gesture_amount();
-            }
-
-            // 右: 右のタブへ Ctrl+Tab
-            if (gesture_x > GESTURE_THRESHOLD) {
-                tap_code16(C(KC_TAB));
-                reset_gesture_amount();
-            }
-
-            // 左: 左のタブへ Ctrl+Shift+Tab
-            if (gesture_x < -GESTURE_THRESHOLD) {
-                tap_code16(C(S(KC_TAB)));
-                reset_gesture_amount();
-            }
+            reset_gesture_amount();
         }
     }
 
