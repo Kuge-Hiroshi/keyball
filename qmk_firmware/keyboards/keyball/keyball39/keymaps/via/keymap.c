@@ -27,10 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
-#include "deferred_exec.h"
 
 #define THUMB_HOLD_TERM 150
-#define KB23_ESC_DELAY_MS 30
 
 
 
@@ -290,6 +288,17 @@ void process_combo_event(uint16_t combo_index, bool pressed) {
 // 例: 100=高感度 / 300=低感度 / 1000以上=かなり鈍い
 #define GESTURE_THRESHOLD 250
 
+// Kb23: Win+矢印の直後に送るESCを短時間保持し、
+// Windows側での取りこぼしを減らす。
+// Deferred Executorは使わないため、ファームウェア容量の増加を抑えられる。
+#define KB23_ESC_HOLD_US 500
+
+static void send_kb23_esc(void) {
+    register_code(KC_ESC);
+    wait_us(KB23_ESC_HOLD_US);
+    unregister_code(KC_ESC);
+}
+
 // Kb27専用の矢印キー用しきい値
 // 数値を大きくすると、より大きく転がした時だけ矢印キーが入力されます。
 #define GESTURE27_X_THRESHOLD 150
@@ -316,28 +325,6 @@ static uint8_t active_gesture_mode = GESTURE_NONE;
 static bool alt_tab_active  = false;
 // Kb23: 発火後、ボールが止まるまで再発火しないための待機フラグ
 static bool gesture23_wait_for_stop = false;
-
-// Kb23: Win+矢印の処理後、WindowsのSnap Assist表示を待ってからESCを送る。
-// pointing_device_task_user()をwait_ms()で止めないためDeferred Executorを使用する。
-static deferred_token kb23_esc_token = INVALID_DEFERRED_TOKEN;
-
-static uint32_t kb23_send_esc_deferred(uint32_t trigger_time, void *cb_arg) {
-    (void)trigger_time;
-    (void)cb_arg;
-
-    kb23_esc_token = INVALID_DEFERRED_TOKEN;
-    tap_code(KC_ESC);
-    return 0;
-}
-
-static void schedule_kb23_esc(void) {
-    // 既に予約が残っている場合は、古い予約を取り消して最新の操作を優先する。
-    if (kb23_esc_token != INVALID_DEFERRED_TOKEN) {
-        cancel_deferred_exec(kb23_esc_token);
-    }
-
-    kb23_esc_token = defer_exec(KB23_ESC_DELAY_MS, kb23_send_esc_deferred, NULL);
-}
 
 // 現在押されているジェスチャーキーの物理位置。
 // リリースイベントを取りこぼしても matrix_is_on() で実状態を確認する。
@@ -707,7 +694,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 上: Win+↑ -> Esc
             if (gesture_y < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_UP));
-                schedule_kb23_esc();
+                send_kb23_esc();
                             gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
@@ -715,7 +702,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 下: Win+↓ -> Esc
             if (gesture_y > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_DOWN));
-                schedule_kb23_esc();
+                send_kb23_esc();
                             gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
@@ -723,7 +710,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 右: アクティブウィンドウを右側へ寄せ、左側のウィンドウ選択をキャンセル
             if (gesture_x > GESTURE_THRESHOLD) {
                 tap_code16(G(KC_RGHT));
-                schedule_kb23_esc();
+                send_kb23_esc();
                             gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
@@ -731,7 +718,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             // 左: アクティブウィンドウを左側へ寄せ、右側のウィンドウ選択をキャンセル
             if (gesture_x < -GESTURE_THRESHOLD) {
                 tap_code16(G(KC_LEFT));
-                schedule_kb23_esc();
+                send_kb23_esc();
                             gesture23_wait_for_stop = true;
                 reset_gesture_amount();
             }
